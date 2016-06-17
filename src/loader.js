@@ -39,7 +39,12 @@ function loadActors( fount, actors ) {
 			function() {
 				return _.cloneDeep( instance.state );
 			};
-		processHandles( instance );
+		try {
+			processHandles( instance );
+		}
+		catch ( e ) {
+			console.log( "Error processing actor", instance.actor.type, e );
+		}
 		acc[ instance.actor.type ] = {
 			factory: factory,
 			metadata: instance

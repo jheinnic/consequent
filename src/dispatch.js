@@ -8,9 +8,14 @@ var log = require( "./log" )( "consequent.dispatch" );
 
 function enrichEvent( set, event ) {
 	event.id = sliver.getId();
-	event.correlationId = set.actor.id;
-	event.vector = set.actor.vector;
-	event.actorType = set.actor.type;
+	var ambientType = event.type ? event.type.split( "." )[ 0 ] : "";
+	if ( ambientType === set.actor.type ) {
+		event.correlationId = set.actor.id;
+		event.vector = set.actor.vector;
+		event.actorType = set.actor.type;	
+	} else {
+		event.actorType = ambientType;
+	}
 	event.initiatedBy = set.message.type || set.message.topic;
 	event.initiatedById = set.message.id;
 	event.createdOn = new Date().toISOString();

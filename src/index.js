@@ -3,6 +3,7 @@ var loader = require( "./loader" );
 var managerFn = require( "./manager" );
 var actorsFn = require( "./actors" );
 var eventsFn = require( "./events" );
+var searchFn = require( "./search" );
 var subscriptions = require( "./subscriptions" );
 var path = require( "path" );
 var apply = require( "./apply" );
@@ -13,7 +14,8 @@ var defaults = {
 	actorCache: require( "./default/actorCache" )(),
 	actorStore: require( "./default/actorStore" )(),
 	eventCache: require( "./default/eventCache" )(),
-	eventStore: require( "./default/eventStore" )()
+	eventStore: require( "./default/eventStore" )(),
+	searchAdapter: require( "./default/searchAdapter" )(),
 };
 
 function initialize( config ) {
@@ -25,8 +27,9 @@ function initialize( config ) {
 	config.actorStore = config.actorStore || defaults.actorStore;
 	config.eventCache = config.eventCache || defaults.eventCache;
 	config.eventStore = config.eventStore || defaults.eventStore;
+	config.searchAdapter = config.searchAdapter || defaults.searchAdapter;
 
-	if( !config.fount ) {
+	if ( !config.fount ) {
 		config.fount = require( "fount" );
 	}
 
@@ -40,6 +43,7 @@ function initialize( config ) {
 		var actorAdapter = actorsFn( actors, config.actorStore, config.actorCache, config.nodeId || defaultNodeId );
 		var eventAdapter = eventsFn( config.eventStore, config.eventCache );
 		var manager = managerFn( actors, actorAdapter, eventAdapter, queue );
+		var search = searchFn( actors, config.searchAdapter );
 		var dispatcher = dispatchFn( lookup, manager, actors, config.queue );
 
 		return {
@@ -47,6 +51,7 @@ function initialize( config ) {
 				return apply( actors, config.queue, message.type || message.topic, message, instance );
 			},
 			fetch: manager.getOrCreate,
+			find: search.find,
 			handle: dispatcher.handle,
 			topics: topics,
 			actors: actors

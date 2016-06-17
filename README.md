@@ -36,6 +36,9 @@ var coordinator = require( ... );
 var actorCache = require( ... );
 // eventCache
 var eventCache = require( ... );
+// searchProvider
+var search = require( ... );
+
 var consequent = consequentFn(
 	{
 		actorStore: actors,
@@ -44,6 +47,7 @@ var consequent = consequentFn(
 		eventCache: eventCache,
 		messageBus: messages,
 		coordinator: coordinator,
+		search: search,
 		actorPath: "./actors" // optional path to actor modules
 	} );
 ```
@@ -79,6 +83,9 @@ Rejection will give an error object with the following structure:
 ```
 
 > Note: the actor property will be a clone of the latest snapshot without the events applied.
+
+### find( type, criteria )
+Finds an actor of `type` matching the `criteria` provided that a search adapter has been supplied capable of doing so.
 
 ## Actor
 Consequent will load actor modules ending with `_actor.js` from an `./actors` path . This location can be changed during initialization. The actor module's function should return a hash with the expected structure which includes the following properties:
@@ -391,6 +398,101 @@ Search for a common ancestor for the actorId given the siblings list and ancestr
 
 #### store( actorId, vectorClock, actor )
 Store the latest snapshot and create ancestor.
+
+# Search Adapter
+
+> ! Experimental ! - this API is highly experimental and subject to changes.
+
+The goal behind this adapter is to provide an abstraction that various storage implementations can implement.
+
+## API
+
+### find( criteria )
+Criteria is an array with one or more element where each element is a set of criteria which must be true. Each individual element in the array should effectively be OR'd together.
+
+Specific operations are represented as unique key/value sets. Any adapter implementing this API should throw exceptions for any unsupported operations.
+
+### operations
+
+#### equal
+
+```js
+{
+	x: 100
+}
+```
+
+#### contains
+
+```js
+{
+	x: { contains: 100 }
+}
+```
+
+#### matching / like
+
+```js
+{
+	x: { match: "pattern" }
+}
+```
+
+#### in
+
+```js
+{
+	x: { in: [ 100, 101, 102 ] }
+}
+```
+
+#### not in
+
+```js
+{
+	x: { not: [ 100, 101, 102 ] }
+}
+```
+
+#### greater than
+
+```js
+{
+	x: { gt: 100 }
+}
+```
+
+#### less than
+
+```js
+{
+	x: { lt: 100 }
+}
+```
+
+#### greater than or equal to
+
+```js
+{
+	x: { gte: 100 }
+}
+```
+
+#### less than or equal to
+
+```js
+{
+	x: { lte: 100 }
+}
+```
+
+#### between
+
+```js
+{
+	x: [ lower, upper ]
+}
+```
 
 # Caching Adapters
 While there may not always be a sensible way to implement all the same features in a caching adapter, a valid caching adapter should provide a consistent API even if certain calls are effectively a no-op. Consequent uses read-through/write-through such that cache misses should not have any impact on functionality.

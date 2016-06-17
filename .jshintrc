@@ -82,7 +82,7 @@
 	"worker"      : true,   //defines globals available when your code is running inside of a Web Worker
 	"wsh"         : false,  //defines globals available when your code is running as a script for the Windows Script Host
 	"yui"         : false,  //defines globals exposed by the YUI JavaScript framework
-
+	"esversion": 6,
 	"predef" : [  // Custom globals.
 		"define",
 		"describe",
