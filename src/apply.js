@@ -47,7 +47,7 @@ function getEventHandlers( metadata, instance, topic, message ) {
 }
 
 function processCommand( handle, instance, command ) {
-	var result = handle( instance, command );
+	var result = handle( instance.state, command );
 	result = result && result.then ? result : when( result );
 	var actor = { type: instance.actor.type };
 	_.merge( actor, instance.state );

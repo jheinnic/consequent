@@ -54,7 +54,10 @@ function getLatest( actors, actorAdapter, eventAdapter, queue, type, id, readOnl
 		};
 	}
 	return actorAdapter.fetch( type, id )
-		.then( onActor.bind( null, applyFn, actorAdapter, eventAdapter, readOnly ) );
+		.then( onActor.bind( null, applyFn, actorAdapter, eventAdapter, readOnly ) )
+		.then( function( instance ) {
+			return instance.state;
+		} );
 }
 
 function snapshot( actorAdapter, eventAdapter, events, readOnly, instance ) {

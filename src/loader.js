@@ -43,7 +43,7 @@ function loadActors( fount, actors ) {
 			processHandles( instance );
 		}
 		catch ( e ) {
-			console.log( "Error processing actor", instance.actor.type, e );
+			log( "Error processing actor %s with %s", instance.actor.type, e.stack ? e.stack : e );
 		}
 		acc[ instance.actor.type ] = {
 			factory: factory,

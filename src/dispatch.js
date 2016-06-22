@@ -12,7 +12,7 @@ function enrichEvent( set, event ) {
 	if ( ambientType === set.actor.type ) {
 		event.correlationId = set.actor.id;
 		event.vector = set.actor.vector;
-		event.actorType = set.actor.type;	
+		event.actorType = set.actor.type;
 	} else {
 		event.actorType = ambientType;
 	}
@@ -24,8 +24,11 @@ function enrichEvent( set, event ) {
 function enrichEvents( manager, result ) {
 	var promises = _.reduce( result, function( acc, set ) {
 		_.each( set.events, enrichEvent.bind( null, set ) );
-		var promise = manager.storeEvents( set.actor.type, set.actor.id, set.events );
-		acc.push( promise );
+		var types = _.groupBy( set.events, "actorType" );
+		_.each( types, function( events, actorType ) {
+			var promise = manager.storeEvents( actorType, events[ 0 ].correlationId, events );
+			acc.push( promise );
+		} );
 		return acc;
 	}, [] );
 
