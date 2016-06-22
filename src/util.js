@@ -2,9 +2,18 @@ var _ = require( "lodash" );
 
 function getArguments( fn ) {
 	var fnString = fn.toString();
-	if ( /[(][^)]*[)]/.test( fnString ) ) {
-		return _.isFunction( fn ) ?
-			trim( /[(]([^)]*)[)]/.exec( fnString )[ 1 ].split( "," ) ) : [];
+	var argsRegex = /[(][^)]*[)]/;
+	if ( argsRegex.test( fnString ) ) {
+		var argList = argsRegex.exec( fnString )[ 0 ];
+		var argRegex = /(\w+|[{]\s*(\w+[,]?\s?)*\s*[}])/g;
+		var list = [];
+		do {
+			var arg = argRegex.exec( argList );
+			if( arg ) {
+				list.push( arg[ 0 ] );
+			}
+		} while( arg );
+		return list;
 	} else {
 		return undefined;
 	}
@@ -14,12 +23,16 @@ function mapMessageToCall( method, map ) {
 	var argumentList = getArguments( method ).slice( 1 );
 	if ( map === false || map === undefined ) {
 		return method;
-	} else if ( map ) {
+	} else if ( _.isObject( map ) ) {
 		return function( actor, message ) {
 			var appliedArgs = [ actor ];
 			_.each( argumentList, function( arg ) {
-				var prop = map[ arg ] ? map[ arg ] : arg;
-				appliedArgs.push( message[ prop ] );
+				if( /[{].*[}]/.test( arg ) ) {
+					appliedArgs.push( message );
+				} else {
+					var prop = map[ arg ] ? map[ arg ] : arg;
+					appliedArgs.push( message[ prop ] );
+				}
 			} );
 			return method.apply( undefined, appliedArgs );
 		};
@@ -27,7 +40,11 @@ function mapMessageToCall( method, map ) {
 		return function( actor, message ) {
 			var appliedArgs = [ actor ];
 			_.each( argumentList, function( arg ) {
-				appliedArgs.push( message[ arg ] );
+				if( /[{].*[}]/.test( arg ) ) {
+					appliedArgs.push( message );
+				} else {
+					appliedArgs.push( message[ arg ] );
+				}
 			} );
 			return method.apply( undefined, appliedArgs );
 		};
@@ -43,5 +60,6 @@ function trim( list ) {
 }
 
 module.exports = {
-	mapCall: mapMessageToCall
+	mapCall: mapMessageToCall,
+	getArguments: getArguments
 };

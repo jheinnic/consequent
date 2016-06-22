@@ -18,7 +18,6 @@ describe( "Utility/Helpers", function() {
 
 			before( function() {
 				var fn = util.mapCall( model.test, true );
-
 				result = fn( actor, message );
 			} );
 
@@ -87,12 +86,32 @@ describe( "Utility/Helpers", function() {
 
 				before( function() {
 					var fn = util.mapCall( model.test, true );
-
 					result = fn( actor, message );
 				} );
 
 				it( "should call the function with undefined arguments", function() {
 					result.should.eql( [ actor, undefined, undefined, undefined ] );
+				} );
+			} );
+		} );
+
+		describe( "with ES6 destructuring", function() {
+			var nextLevel1 = ( actor, { a, b, c, d } ) => [ actor, a, b, c, d ];
+			var nextLevel2 = ( actor, { a, b, c }, d ) => [ actor, a, b, c, d ];
+			var nextLevel3 = ( actor, { a, b, c }, e ) => [ actor, a, b, c, e ];
+			var nextLevel4 = ( actor, { a, b, c, e } ) => [ actor, a, b, c, e ];
+			var actor = { id: 1 };
+			var message = { a: "a", b: "b", c: "c", d: "d" };
+
+			describe( "and complete match", function() {
+				var result;
+				before( function() {
+					var fn = util.mapCall( nextLevel1, true );
+					result = fn( actor, message );
+				} );
+
+				it( "should pass all arguments correctly", function() {
+					result.should.eql( [ actor, "a", "b", "c", "d" ] );
 				} );
 			} );
 		} );

@@ -50,7 +50,11 @@ function initialize( config ) {
 			apply: function( instance, message ) {
 				return apply( actors, config.queue, message.type || message.topic, message, instance );
 			},
-			fetch: manager.getOrCreate,
+			fetch: ( type, id, readOnly ) => {
+				return manager.getOrCreate( type, id, readOnly )
+					.then( ( instance ) => instance.state );
+			},
+			fetchRaw: manager.getOrCreate,
 			find: search.find,
 			handle: dispatcher.handle,
 			topics: topics,
