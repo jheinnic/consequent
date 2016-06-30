@@ -2,6 +2,12 @@ var _ = require( "lodash" );
 var format = require( "util" ).format;
 var log = require( "./log" )( "consequent.events" );
 
+function remap( sliver, actorType, actorId, event ) {
+	event.id = event.id || sliver.getId();
+	event.correlationId = actorId;
+	event.actorType = actorType;
+}
+
 function getAdapter( adapters, lib, io, type ) {
 	var adapter = adapters[ io ][ type ];
 	if ( !adapter ) {
@@ -17,6 +23,26 @@ function getCache( adapters, cacheLib, type ) {
 
 function getStore( adapters, storeLib, type ) {
 	return getAdapter( adapters, storeLib, "store", type );
+}
+
+function findEvents( adapters, storeLib, type, criteria, lastEventId, noError ) {
+	var store = getStore( adapters, storeLib, type );
+
+	function onEvents( events ) {
+		return _.sortBy( events, "id" );
+	}
+
+	function onError( err ) {
+		var error = `Failed to get ${type} events by criteria ${criteria} with error ${err}`;
+		log.error( error );
+		if ( noError ) {
+			return [];
+		}
+		throw new Error( error );
+	}
+
+	return store.findEvents( criteria, lastEventId )
+		.then( onEvents, onError );
 }
 
 function getEventsFromCache( adapters, cacheLib, type, id, lastEventId, noError ) {
@@ -109,6 +135,26 @@ function getEvents( adapters, storeLib, cacheLib, type, id, lastEventId, noError
 		} );
 }
 
+function getEventsByIndex( adapters, storeLib, cacheLib, type, indexName, indexValue, lastEventId, noError ) {
+	var store = getStore( adapters, storeLib, type );
+
+	function onEvents( events ) {
+		return _.sortBy( events, "id" );
+	}
+
+	function onError( err ) {
+		var error = `Failed to get ${type} events by index ${indexName} of ${indexValue} with error ${err}`;
+		log.error( error );
+		if ( noError ) {
+			return [];
+		}
+		throw new Error( error );
+	}
+
+	return store.getEventsByIndex( indexName, indexValue, lastEventId )
+		.then( onEvents, onError );
+}
+
 function getPack( adapters, storeLib, cacheLib, type, id, vector ) {
 	function onEvents( cachedEvents ) {
 		if ( cachedEvents.length === 0 ) {
@@ -123,6 +169,11 @@ function getPack( adapters, storeLib, cacheLib, type, id, vector ) {
 		.then( function( events ) {
 			return _.sortBy( events, "id" );
 		} );
+}
+
+function mapEvents( sliver, adapters, storeLib, cacheLib, type, id, events ) {
+	var remapped = _.map( events, remap.bind( null, sliver, type, id ) );
+	return storeEvents( adapters, storeLib, cacheLib, type, id, remapped );
 }
 
 function storeEvents( adapters, storeLib, cacheLib, type, id, events ) {
@@ -190,7 +241,7 @@ function storePack( adapters, storeLib, cacheLib, type, id, vector, lastEventId,
 		.then( onEvents, onEventsError );
 }
 
-module.exports = function( eventStoreLib, eventCacheLib ) {
+module.exports = function( sliver, eventStoreLib, eventCacheLib ) {
 	var adapters = {
 		store: {},
 		cache: {}
@@ -198,7 +249,10 @@ module.exports = function( eventStoreLib, eventCacheLib ) {
 	return {
 		adapters: adapters,
 		fetch: getEvents.bind( null, adapters, eventStoreLib, eventCacheLib ),
+		fetchByIndex: getEventsByIndex.bind( null, adapters, eventStoreLib, eventCacheLib ),
 		fetchPack: getPack.bind( null, adapters, eventStoreLib, eventCacheLib ),
+		find: findEvents.bind( null, adapters, eventStoreLib ),
+		mapEvents: mapEvents.bind( null, sliver, adapters, eventStoreLib, eventCacheLib ),
 		store: storeEvents.bind( null, adapters, eventStoreLib, eventCacheLib ),
 		storePack: storePack.bind( null, adapters, eventStoreLib, eventCacheLib )
 	};

@@ -13,7 +13,7 @@ var fount = require( "fount" );
 var consequentFn = require( "consequent" );
 
 // minimum I/O adapters
-// actor store
+// actor stores
 var actors = require( ... );
 // event store
 var events = require( ... );
@@ -57,8 +57,30 @@ var consequent = consequentFn(
 ### apply( actor, events )
 Applies a series of events to an actor instance. The promise returned will resolve to a new instance of the actor that is the result of applying ordered events against the actor's initial state or reject with an error.
 
-### fetch( actorType, actorId )
+> Note: If you use this call to apply events from an event stream, keep in mind that it does not protect you from events arriving out of order.
+
+### fetch( actorType, actorId, [ eventSpecifications ] )
 Get the actor's current state by finding the latests snapshot and applying events since that snapshot was taken. The promise returned will either resolve to the actor or reject with an error.
+
+Optionally, `eventSpecifications` can be supplied such that events from other actors' event streams will be included; a common use case when fetching a read model that requires events from multiple actors.
+
+```js
+// example event specifications
+
+// when looking up events by an index defined on the event
+[ {
+	actor: "actorName",
+	index: { name: "index_name", value: "index_value" }
+} ]
+
+// when looking up events by search criteria
+[ {
+	actor: "actorName",
+	where: { // see the find criteria for specifics on how to specify criteria
+		property: "value"
+	}
+} ]
+```
 
 ### handle( actorId, topic|type, command|event )
 Process a command or event and return a promise that resolves to the originating message, the actor snapshot and resulting events. The promise will reject if any problems occur while processing the message.
@@ -87,8 +109,11 @@ Rejection will give an error object with the following structure:
 ### find( type, criteria )
 Finds an actor of `type` matching the `criteria` provided that a search adapter has been supplied capable of doing so.
 
+### mapEvents( actorType, actorId, events )
+Takes events produced by another actor and rewrites them to a new event store. The intended use case for this is for read models that need access to a broad range of events that would be prohibitively expensive or difficult to acquire at read time via `eventSpecifications`.
+
 ## Actor
-Consequent will load actor modules ending with `_actor.js` from an `./actors` path . This location can be changed during initialization. The actor module's function should return a hash with the expected structure which includes the following properties:
+Consequent will load actor modules ending with `_actor.js` from an `./actors` path. This location can be changed during initialization. The actor module's function should return a hash with the expected structure which includes the following properties:
 
  * `actor` - metadata and configuration properties
  * `state` - default state hash or a factory to initialize the actor instance
@@ -185,7 +210,9 @@ This is a short-hand form of the hash form. It's probably not worth sacrificing 
 If the default values for `when`, `exclusive` and `map` are what you need, just provide the function instead of a hash with only the `then` property.
 
 ### Handler functions
-A command handler returns an array of events or a promise that resolves to one. An event handler mutates the actor's state directly based on the event and returns nothing.
+A command handler returns an array of events or a promise that resolves to one. An event handler mutates the actor's state directly based on the event and returns nothing. Command handlers may be asynchronous and result in a promise. Event application _must be synchronous_ and should never rely on outside I/O.
+
+> Note: Event application isn't implemented as strictly _pure_ because Consequent is already constructing a new instance of the actor for you to apply the events to. Consequent was built with stateless services in mind, so there should be no ambient state pollution to worry about during event application.
 
 _Example_
 ```javascript
@@ -286,11 +313,54 @@ module.exports = function() {
 };
 ```
 
+## Event
+Events must specify a dot delimited `type` property where the first part is the name of the actor that will "own" the event. In almost every case, this will be the name of the actor producing the event. Below is a list of properties that will exist on an event after consequent has received the event:
 
-## Concepts
+### Required Properties
+```js
+{
+	type: "actor.eventName"
+}
+```
+
+### Supplied Properties
+```js
+{
+	id: "", // this will be a generated flake id for this event
+	actorType: "", // the type of the actor the event was generated for
+	correlationId: "actorId", // this is the addressable identity of the owning actor
+	createdOn: "", // UTC ISO date time string when event was created
+	initiatedBy: "", // the command type/topic that triggered the event
+	initiatedById: "", // the id of the message that triggered the event
+}
+```
+
+### optional properties
+```js
+{
+	actorType: "", // override this to produce an event for another actor
+	correlationId: "", // override to control the id of the actor the event is created for
+	indexBy: { // if indexing by values not already defined on the event
+		indexName: "indexValue" // key value to index the event by
+	},
+	indexBy: [ // if indexing by event properties
+		indexName, // the name of the event property to index by for future lookup
+	]
+}
+```
+
+### Event Indexing
+Event indexing exists so that events can be easily included in read models that require event streams from multiple actors. This happens frequently in parent-child associations. Indexing the events with the parent id will make it possible to pull in child events 
+
+# Concepts
 Here's a breakdown of the primitives involved in this implementation:
 
-### Event Sourced Actors
+## Domain Models vs. View Models
+Actors can represent either a domain model (an actor that processes commands and produces events), or a view model (an actor that only aggregates events produced by other models). The intent is to represent application behavior and features through domain models and use view models to satisfy read behavior for the application.
+
+This satisfies CQRS at an architectural level in that domain model actors and view model actors can be hosted in separate processes that use specialized transports/topologies for communication.
+
+## Event Sourced Actors
 This approach borrows from event sourcing, CQRS and CRDT work done by others. It's not original, but perhaps a slightly different take on event sourcing.
 
 ### Events
@@ -303,15 +373,10 @@ Any time an actor's present state is required (on read or on processing a comman
 ### Actors
 An actor is identified by a unique id and a vector clock. Instead of mutating and persisting actor state after each message, actors generate events when processing a message. Before processing a message, an actor's last available persisted state is loaded from storage, all events generated since the actor was persisted are loaded and applied to the actor.
 
-After some threshold of applied events is crossed, the resulting actor will be persisted with a new vector clock to prevent the number of events that need to be applied from creating an unbounded negative impact to performance over time.
+After some threshold of applied events is crossed, the resulting actor's state will be persisted with a new vector clock (referred to as a snapshot) to prevent needing to replay these events again. This provides a means of preventing unbound event replay being required to determine present state.
 
 __The Importance of Isolation__
-The expectation in this approach is that actors' messages will be processed in isolation at both a machine and process level. Another way to put this is that no two messages for an actor should be processed at the same time in an environment. The exception to this assumption is network partitions. Read on to see how this approach deals with partitions.
-
-#### Models vs. Views
-Actors can represent either a model, an actor that processes commands and produces events, or a view, an actor that only aggregates events produced by other models. The intent is to represent application behavior and features through models and use views to simply aggregate events to provide read models or materialized views for the application.
-
-This provides CQRS at an architectural level in that model actors and view actors can be hosted in separate processes that use specialized transports/topologies for communication.
+The expectation in this approach is that actors' messages will be processed in isolation at both a machine and process level. Another way to put this is that no two command messages for an actor should be processed at the same time in an environment. The exception to this assumption is network partitions. Read on to see how this approach deals with partitions.
 
 ### Divergent Replicas
 In the event of a network partition, if commands or events are processed for the same actor on more than one partition, replicas can be created. These replicas may result in multiple copies of the same actor with different state. When this happens, multiple actors will be retrieved when the next message is processed.
@@ -364,8 +429,14 @@ Responsibilities:
 #### create( actorType )
 Creates an eventStore instance for a specific type of actor.
 
+#### findEvents( criteria, lastEventId ) OPTIONAL
+Retrieve events based on a set of criteria. When not implementing this call, the event store should resolve this to a rejected promise explaining that this is not or cannot be implemented.
+
 #### getEventsFor( actorId, lastEventId )
 Retrieve events for the `actorId` that occurred since the `lastEventId`.
+
+#### getEventsByIndex( indexName, indexValue, lastEventId ) OPTIONAL
+Retrieve events based on a previously established index value for the event. When not implementing this call, the event store should resolve this to a rejected promise explaining that this is not or cannot be implemented.
 
 #### getEventPackFor( actorId, vectorClock )
 Fetch and unpack events that were stored when the snapshot identified by `actorId` and `vectorClock` was created.
@@ -391,7 +462,7 @@ Responsibilities
 Creates an actor store instance for a specific type of actor.
 
 #### fetch( actorId )
-Return the latest snapshot for the `actorId`. Must provide replicas/siblings if they exist.
+Return the latest snapshot for the `actorId`. Must provide replicas/siblings if they exist. By default, all events that belong to actorId since the last snapshot will be included in determining the actor's state. 
 
 #### findAncestor( actorId, siblings, ancestry )
 Search for a common ancestor for the actorId given the siblings list and ancestry. Likely implemented as a recursive call. Must be capable of identifying cycles in snapshot ancestry. Should resolve to nothing or the shared ancestor snapshot.

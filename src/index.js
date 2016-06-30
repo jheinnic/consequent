@@ -8,6 +8,7 @@ var subscriptions = require( "./subscriptions" );
 var path = require( "path" );
 var apply = require( "./apply" );
 var hashqueue = require( "hashqueue" );
+var sliver = require( "sliver" )();
 var defaultNodeId = [ process.title, process.pid ].join( "-" );
 
 var defaults = {
@@ -41,10 +42,10 @@ function initialize( config ) {
 		var lookup = subscriptions.getActorLookup( actors );
 		var topics = subscriptions.getTopics( actors );
 		var actorAdapter = actorsFn( actors, config.actorStore, config.actorCache, config.nodeId || defaultNodeId );
-		var eventAdapter = eventsFn( config.eventStore, config.eventCache );
+		var eventAdapter = eventsFn( sliver, config.eventStore, config.eventCache );
 		var manager = managerFn( actors, actorAdapter, eventAdapter, queue );
 		var search = searchFn( actors, config.searchAdapter );
-		var dispatcher = dispatchFn( lookup, manager, actors, config.queue );
+		var dispatcher = dispatchFn( sliver, lookup, manager, actors, config.queue );
 
 		return {
 			apply: function( instance, message ) {
@@ -55,6 +56,7 @@ function initialize( config ) {
 					.then( ( instance ) => instance.state );
 			},
 			fetchRaw: manager.getOrCreate,
+			mapEvents: eventAdapter.mapEvents,
 			find: search.find,
 			handle: dispatcher.handle,
 			topics: topics,

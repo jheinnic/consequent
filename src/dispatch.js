@@ -3,8 +3,8 @@ var when = require( "when" );
 var hashqueue = require( "hashqueue" );
 var format = require( "util" ).format;
 var apply = require( "./apply" );
-var sliver = require( "sliver" )();
 var log = require( "./log" )( "consequent.dispatch" );
+var sliver;
 
 function enrichEvent( set, event ) {
 	event.id = sliver.getId();
@@ -79,7 +79,8 @@ function onInstanceError( type, err ) {
 	return when.reject( new Error( error ) );
 }
 
-module.exports = function( lookup, manager, actors, queue, limit ) {
+module.exports = function( sliverFn, lookup, manager, actors, queue, limit ) {
+	sliver = sliverFn;
 	queue = queue || hashqueue.create( limit || 8 );
 	return {
 		apply: apply.bind( undefined, actors, queue ),

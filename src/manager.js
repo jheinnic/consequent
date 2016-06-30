@@ -10,7 +10,7 @@ function getSourceId( instance, source, id ) {
 	return propId || nestedId || id;
 }
 
-function onActor( applyFn, actorAdapter, eventAdapter, readOnly, instance ) {
+function onActor( applyFn, actorAdapter, eventAdapter, eventCriteria, readOnly, instance ) {
 	if ( _.isArray( instance ) ) {
 		var first = instance[ 0 ];
 		return actorAdapter.findAncestor( first.state.id, instance, [] )
@@ -32,6 +32,20 @@ function onActor( applyFn, actorAdapter, eventAdapter, readOnly, instance ) {
 					var list = _.sortBy( _.flatten( lists ), "id" );
 					return onEvents( actorAdapter, eventAdapter, instance, factory, readOnly, list );
 				} );
+		} else if( eventCriteria && eventCriteria.length ) {
+			var promises = _.map( eventCriteria, function( criteria ) {
+				var last = instance.state.lastEventId[ criteria.actor ];
+				if( criteria.index ) {
+					return evenAdapter.fetchByIndex( criteria.actor, criteria.index.name, criteria.index.value, last );
+				} else {
+					return eventAdapter.find( criteria.actor, criteria.where, last );
+				}
+			} );
+			return when.all( promises )
+				.then( function( lists ) {
+					var list = _.sortBy( _.flatten( lists ), "id" );
+					return onEvents( actorAdapter, eventAdapter, instance, factory, readOnly, list );
+				} );
 		} else {
 			return eventAdapter.fetch( type, id, lastEventId )
 				.then( onEvents.bind( null, actorAdapter, eventAdapter, instance, factory, readOnly ) );
@@ -47,14 +61,14 @@ function onEvents( actorAdapter, eventAdapter, instance, factory, readOnly, even
 		} );
 }
 
-function getLatest( actors, actorAdapter, eventAdapter, queue, type, id, readOnly ) {
+function getLatest( actors, actorAdapter, eventAdapter, queue, type, id, eventCriteria, readOnly ) {
 	function applyFn( instance, event ) {
 		return function() {
 			return apply( actors, queue, event.type, event, instance );
 		};
 	}
 	return actorAdapter.fetch( type, id )
-		.then( onActor.bind( null, applyFn, actorAdapter, eventAdapter, readOnly ) );
+		.then( onActor.bind( null, applyFn, actorAdapter, eventAdapter, eventCriteria, readOnly ) );
 }
 
 function snapshot( actorAdapter, eventAdapter, events, readOnly, instance ) {
