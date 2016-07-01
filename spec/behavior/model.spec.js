@@ -1,7 +1,7 @@
 require( "../setup" );
 var loader = require( "../../src/loader" );
 var fount = require( "fount" );
-var actorFn = require( "../../src/actors" );
+var modelFn = require( "../../src/model" );
 
 var store = {
 	fetch: _.noop,
@@ -13,21 +13,21 @@ var cache = {
 	store: _.noop
 };
 
-describe( "Actors", function() {
-	var actors;
+describe( "Models", function() {
+	var models;
 	before( function() {
-		return loader( fount, "./spec/actors" )
+		return loader( fount, "./spec/models" )
 			.then( function( list ) {
-				actors = list;
+				models = list;
 			} );
 	} );
 
-	describe( "when fetching an actor", function() {
-		var actor;
+	describe( "when fetching an model", function() {
+		var model;
 		before( function() {
-			actor = actorFn( actors, {}, {} );
-			actor.adapters.store.account = store;
-			actor.adapters.cache.account = cache;
+			model = modelFn( models, {}, {} );
+			model.adapters.store.account = store;
+			model.adapters.cache.account = cache;
 		} );
 
 		describe( "and cached snapshot exists", function() {
@@ -47,7 +47,7 @@ describe( "Actors", function() {
 			} );
 
 			it( "should resolve fetch with instance", function() {
-				return actor.fetch( "account", 1010 )
+				return model.fetch( "account", 1010 )
 					.should.eventually.partiallyEql( { state: account } );
 			} );
 
@@ -79,7 +79,7 @@ describe( "Actors", function() {
 			} );
 
 			it( "should resolve fetch with instance", function() {
-				return actor.fetch( "account", 1010 )
+				return model.fetch( "account", 1010 )
 					.should.eventually.partiallyEql( { state: account } );
 			} );
 
@@ -112,7 +112,7 @@ describe( "Actors", function() {
 				} );
 
 				it( "should resolve fetch with instance", function() {
-					return actor.fetch( "account", 1010 )
+					return model.fetch( "account", 1010 )
 						.should.eventually.partiallyEql( { state: account } );
 				} );
 
@@ -145,7 +145,7 @@ describe( "Actors", function() {
 				} );
 
 				it( "should resolve fetch with instance", function() {
-					return actor.fetch( "account", 1010 )
+					return model.fetch( "account", 1010 )
 						.should.be.rejectedWith( "Failed to get instance '1010' of 'account' from store with Error: This is bad" );
 				} );
 
@@ -177,7 +177,7 @@ describe( "Actors", function() {
 				} );
 
 				it( "should resolve fetch with instance", function() {
-					return actor.fetch( "account", 1010 )
+					return model.fetch( "account", 1010 )
 						.should.eventually.partiallyEql( { state: account } );
 				} );
 
@@ -193,11 +193,11 @@ describe( "Actors", function() {
 	} );
 
 	describe( "when storing snapshot", function() {
-		var actor;
+		var model;
 		before( function() {
-			actor = actorFn( actors, {}, {}, "a" );
-			actor.adapters.store.account = store;
-			actor.adapters.cache.account = cache;
+			model = modelFn( models, {}, {}, "a" );
+			model.adapters.store.account = store;
+			model.adapters.cache.account = cache;
 		} );
 
 		describe( "when store and cache are successful", function() {
@@ -218,7 +218,7 @@ describe( "Actors", function() {
 			} );
 
 			it( "should resolve store call", function() {
-				return actor.store( { actor: { type: "account" }, state: account } )
+				return model.store( { model: { type: "account" }, state: account } )
 					.should.eventually.eql( account );
 			} );
 
@@ -247,8 +247,8 @@ describe( "Actors", function() {
 			} );
 
 			it( "should resolve store call", function() {
-				return actor.store( { actor: { type: "account" }, state: account } )
-					.should.be.rejectedWith( "Failed to store actor '1001' of 'account' with Error: fail whale" );
+				return model.store( { model: { type: "account" }, state: account } )
+					.should.be.rejectedWith( "Failed to store model '1001' of 'account' with Error: fail whale" );
 			} );
 
 			it( "should store snapshot", function() {
@@ -278,8 +278,8 @@ describe( "Actors", function() {
 			} );
 
 			it( "should resolve store call", function() {
-				return actor.store( { actor: { type: "account" }, state: account } )
-					.should.be.rejectedWith( "Failed to cache actor '1001' of 'account' with Error: No cache for you" );
+				return model.store( { model: { type: "account" }, state: account } )
+					.should.be.rejectedWith( "Failed to cache model '1001' of 'account' with Error: No cache for you" );
 			} );
 
 			it( "should store snapshot", function() {

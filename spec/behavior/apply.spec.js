@@ -15,7 +15,7 @@ function nope() {
 function createMetadata() {
 	return {
 		test: {
-			actor: {
+			model: {
 				type: "test"
 			},
 			state: {
@@ -25,7 +25,7 @@ function createMetadata() {
 				doOne: [
 					{
 						when: nope,
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "one.zero", id: 1 }
 							];
@@ -33,7 +33,7 @@ function createMetadata() {
 					},
 					{
 						when: yep,
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "one.one", id: 1 }
 							];
@@ -41,7 +41,7 @@ function createMetadata() {
 					},
 					{
 						when: yep,
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "one.two", id: 2 }
 							];
@@ -51,7 +51,7 @@ function createMetadata() {
 				doTwo: [
 					{
 						when: yep,
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "two.one", id: 3 }
 							];
@@ -59,7 +59,7 @@ function createMetadata() {
 						exclusive: false
 					},
 					{
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "two.two", id: 4 }
 							];
@@ -69,10 +69,10 @@ function createMetadata() {
 				],
 				doThree: [
 					{
-						when: function( actor ) {
-							return actor.canDoThree;
+						when: function( model ) {
+							return model.canDoThree;
 						},
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "three.one", id: 5 }
 							];
@@ -80,10 +80,10 @@ function createMetadata() {
 						exclusive: false
 					},
 					{
-						when: function( actor ) {
-							return actor.canDoThree;
+						when: function( model ) {
+							return model.canDoThree;
 						},
-						then: function( actor, command ) {
+						then: function( model, command ) {
 							return [
 								{ type: "three.two", id: 6 }
 							];
@@ -96,22 +96,22 @@ function createMetadata() {
 				onOne: [
 					{
 						when: false,
-						then: function( actor, event ) {
-							actor.zero = true;
+						then: function( model, event ) {
+							model.zero = true;
 						},
 						exclusive: true
 					},
 					{
 						when: true,
-						then: function( actor, event ) {
-							actor.one = true;
+						then: function( model, event ) {
+							model.one = true;
 						},
 						exclusive: true
 					},
 					{
 						when: false,
-						then: function( actor, event ) {
-							actor.two = true;
+						then: function( model, event ) {
+							model.two = true;
 						},
 						exclusive: true
 					}
@@ -119,28 +119,28 @@ function createMetadata() {
 				onTwo: [
 					{
 						when: yep,
-						then: function( actor, event ) {
-							actor.applied = actor.applied || [];
-							actor.applied.push( "two.a" );
+						then: function( model, event ) {
+							model.applied = model.applied || [];
+							model.applied.push( "two.a" );
 						},
 						exclusive: false
 					},
 					{
 						when: true,
-						then: function( actor, event ) {
-							actor.applied = actor.applied || [];
-							actor.applied.push( "two.b" );
+						then: function( model, event ) {
+							model.applied = model.applied || [];
+							model.applied.push( "two.b" );
 						},
 						exclusive: false
 					}
 				],
 				onThree: [
 					{
-						when: function( actor ) {
-							return actor.canApplyThree;
+						when: function( model ) {
+							return model.canApplyThree;
 						},
-						then: function( actor, event ) {
-							actor.applied.push( "three" );
+						then: function( model, event ) {
+							model.applied.push( "three" );
 						}
 					}
 				]
@@ -150,29 +150,27 @@ function createMetadata() {
 }
 
 describe( "Apply", function() {
-	var actors;
+	var models;
 	var instance;
 	before( function() {
 		var metadata = createMetadata();
 		return loader( fount, metadata )
 			.then( function( list ) {
-				actors = list;
-				instance = actors.test.metadata;
+				models = list;
+				instance = models.test.metadata;
 			} );
 	} );
 	describe( "when applying commands", function() {
 		describe( "with matching exclusive filter", function() {
 			it( "should result in only the first matching handler's event", function() {
-				return apply( actors, queue, "doOne", {}, instance )
+				return apply( models, queue, "doOne", {}, instance )
 					.should.eventually.partiallyEql( [
 						{
-							actor: {
-								id: 1,
-								type: "test"
+							model: {
+								id: 1
 							},
 							events: [
 								{
-									id: 1,
 									type: "one.one"
 								}
 							],
@@ -184,29 +182,25 @@ describe( "Apply", function() {
 
 		describe( "with multiple non-exclusive matching filters", function() {
 			it( "should result in all matching handlers' events", function() {
-				return apply( actors, queue, "doTwo", {}, instance )
+				return apply( models, queue, "doTwo", {}, instance )
 					.should.eventually.partiallyEql( [
 						{
-							actor: {
-								id: 1,
-								type: "test"
+							model: {
+								id: 1
 							},
 							events: [
 								{
-									id: 3,
 									type: "two.one"
 								}
 							],
 							message: {}
 						},
 						{
-							actor: {
-								id: 1,
-								type: "test"
+							model: {
+								id: 1
 							},
 							events: [
 								{
-									id: 4,
 									type: "two.two"
 								}
 							],
@@ -218,7 +212,7 @@ describe( "Apply", function() {
 
 		describe( "with no matching filters", function() {
 			it( "should not result in any events", function() {
-				return apply( actors, queue, "doThree", {}, instance )
+				return apply( models, queue, "doThree", {}, instance )
 					.should.eventually.eql( [] );
 			} );
 		} );
@@ -227,7 +221,7 @@ describe( "Apply", function() {
 	describe( "when applying events", function() {
 		describe( "with matching exclusive filter", function() {
 			before( function() {
-				return apply( actors, queue, "onOne", {}, instance );
+				return apply( models, queue, "onOne", {}, instance );
 			} );
 
 			it( "should apply the event according to the first matching handler only", function() {
@@ -239,7 +233,7 @@ describe( "Apply", function() {
 
 		describe( "with multiple non-exclusive matching filters", function() {
 			before( function() {
-				return apply( actors, queue, "onTwo", {}, instance );
+				return apply( models, queue, "onTwo", {}, instance );
 			} );
 
 			it( "should apply the event according to the first matching handler only", function() {
@@ -249,7 +243,7 @@ describe( "Apply", function() {
 
 		describe( "with no matching filters", function() {
 			before( function() {
-				return apply( actors, queue, "onThree", {}, instance );
+				return apply( models, queue, "onThree", {}, instance );
 			} );
 
 			it( "should apply the event according to the first matching handler only", function() {

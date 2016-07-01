@@ -6,7 +6,7 @@ describe( "Consequent Example", function() {
 	var consequent;
 	before( function() {
 		return fn( {
-			actors: "./spec/actors"
+			models: "./spec/models"
 		} ).then( function( x ) {
 			consequent = x;
 		} );
@@ -15,7 +15,7 @@ describe( "Consequent Example", function() {
 	describe( "when fetching for missing record", function() {
 		it( "should result in a blank instance", function() {
 			return consequent.fetch( "account", "0000001" )
-				.should.eventually.partiallyEql( { state:
+				.should.eventually.partiallyEql(
 					{
 						balance: 0,
 						holder: "",
@@ -23,7 +23,7 @@ describe( "Consequent Example", function() {
 						open: false,
 						transactions: []
 					}
-				} );
+				);
 		} );
 	} );
 
@@ -47,23 +47,30 @@ describe( "Consequent Example", function() {
 				return events.should.partiallyEql( [
 					{
 						message: command,
-						actor: {
+						original: {
 							id: "0000001",
 							balance: 0,
 							transactions: []
 						},
+						model: {
+							id: "0000001",
+							balance: 100,
+							transactions: [
+								{ credit: 100, debit: 0 }
+							]
+						},
 						events: [
 							{
-								correlationId: "0000001",
-								actorType: "account",
+								modelId: "0000001",
+								modelType: "account",
 								initiatedBy: "account.open",
 								type: "account.opened",
 								accountHolder: "Test User",
 								accountNumber: "0000001"
 							},
 							{
-								correlationId: "0000001",
-								actorType: "account",
+								modelId: "0000001",
+								modelType: "account",
 								initiatedBy: "account.open",
 								type: "account.deposited",
 								initial: true,
@@ -77,7 +84,7 @@ describe( "Consequent Example", function() {
 			it( "should apply events on next read", function() {
 				return consequent.fetch( "account", "0000001" )
 					.then( function( instance ) {
-						return instance.state.should.partiallyEql(
+						return instance.should.partiallyEql(
 							{
 								id: "0000001",
 								number: "0000001",
@@ -104,7 +111,7 @@ describe( "Consequent Example", function() {
 				it( "should apply events on subsequent read", function() {
 					return consequent.fetch( "account", "0000001" )
 					.then( function( instance ) {
-						return instance.state.should.partiallyEql(
+						return instance.should.partiallyEql(
 							{
 								id: "0000001",
 								number: "0000001",

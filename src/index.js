@@ -1,7 +1,7 @@
 var dispatchFn = require( "./dispatch" );
 var loader = require( "./loader" );
 var managerFn = require( "./manager" );
-var actorsFn = require( "./actors" );
+var modelsFn = require( "./model" );
 var eventsFn = require( "./events" );
 var searchFn = require( "./search" );
 var subscriptions = require( "./subscriptions" );
@@ -12,8 +12,8 @@ var sliver = require( "sliver" )();
 var defaultNodeId = [ process.title, process.pid ].join( "-" );
 
 var defaults = {
-	actorCache: require( "./default/actorCache" )(),
-	actorStore: require( "./default/actorStore" )(),
+	modelCache: require( "./default/modelCache" )(),
+	modelStore: require( "./default/modelStore" )(),
 	eventCache: require( "./default/eventCache" )(),
 	eventStore: require( "./default/eventStore" )(),
 	searchAdapter: require( "./default/searchAdapter" )(),
@@ -24,8 +24,8 @@ function initialize( config ) {
 		adapters: {}
 	} );
 
-	config.actorCache = config.actorCache || defaults.actorCache;
-	config.actorStore = config.actorStore || defaults.actorStore;
+	config.modelCache = config.modelCache || defaults.modelCache;
+	config.modelStore = config.modelStore || defaults.modelStore;
 	config.eventCache = config.eventCache || defaults.eventCache;
 	config.eventStore = config.eventStore || defaults.eventStore;
 	config.searchAdapter = config.searchAdapter || defaults.searchAdapter;
@@ -36,20 +36,20 @@ function initialize( config ) {
 
 	var defaultQueue = hashqueue.create( config.concurrencyLimit || 8 );
 	var queue = config.queue = ( config.queue || defaultQueue );
-	var actorsPath = config.actors || path.join( process.cwd(), "./actors" );
+	var modelsPath = config.models || path.join( process.cwd(), "./models" );
 
-	function onMetadata( actors ) {
-		var lookup = subscriptions.getActorLookup( actors );
-		var topics = subscriptions.getTopics( actors );
-		var actorAdapter = actorsFn( actors, config.actorStore, config.actorCache, config.nodeId || defaultNodeId );
+	function onMetadata( models ) {
+		var lookup = subscriptions.getModelLookup( models );
+		var topics = subscriptions.getTopics( models );
+		var modelAdapter = modelsFn( models, config.modelStore, config.modelCache, config.nodeId || defaultNodeId );
 		var eventAdapter = eventsFn( sliver, config.eventStore, config.eventCache );
-		var manager = managerFn( actors, actorAdapter, eventAdapter, queue );
-		var search = searchFn( actors, config.searchAdapter );
-		var dispatcher = dispatchFn( sliver, lookup, manager, actors, config.queue );
+		var manager = managerFn( models, modelAdapter, eventAdapter, queue );
+		var search = searchFn( models, config.searchAdapter );
+		var dispatcher = dispatchFn( sliver, lookup, manager, models, config.queue );
 
 		return {
 			apply: function( instance, message ) {
-				return apply( actors, config.queue, message.type || message.topic, message, instance );
+				return apply( models, config.queue, message.type || message.topic, message, instance );
 			},
 			fetch: ( type, id, readOnly ) => {
 				return manager.getOrCreate( type, id, readOnly )
@@ -60,11 +60,11 @@ function initialize( config ) {
 			find: search.find,
 			handle: dispatcher.handle,
 			topics: topics,
-			actors: actors
+			models: models
 		};
 	}
 
-	return loader( config.fount, actorsPath )
+	return loader( config.fount, modelsPath )
 		.then( onMetadata );
 }
 

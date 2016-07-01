@@ -2,6 +2,7 @@ require( "../setup" );
 var dispatcherFn = require( "../../src/dispatch" );
 var loader = require( "../../src/loader" );
 var fount = require( "fount" );
+var sliver = require( "sliver" )();
 
 function mockQueue( id, fn ) {
 	var queue = { add: function() {} };
@@ -51,7 +52,7 @@ describe( "Dispatch", function() {
 			queue = mockQueue();
 			manager = mockManager();
 			lookup = {};
-			dispatcher = dispatcherFn( lookup, manager, {}, queue );
+			dispatcher = dispatcherFn( sliver, lookup, manager, {}, queue );
 		} );
 
 		it( "should not queue a task", function() {
@@ -69,10 +70,10 @@ describe( "Dispatch", function() {
 		var queue, lookup, manager, dispatcher;
 
 		before( function() {
-			var actors = {
+			var models = {
 				test: {
 					metadata: {
-						actor: {
+						model: {
 							type: "test"
 						},
 						commands: {
@@ -84,12 +85,12 @@ describe( "Dispatch", function() {
 			queue = mockQueue();
 			manager = mockManager( "test", 100, new Error( ":(" ) );
 			lookup = { doAThing: [ "test" ] };
-			dispatcher = dispatcherFn( lookup, manager, actors, queue );
+			dispatcher = dispatcherFn( sliver, lookup, manager, models, queue );
 		} );
 
 		it( "should not queue a task", function() {
 			return dispatcher.handle( 100, "doAThing", {} )
-				.should.be.rejectedWith( "Failed to instantiate actor \'test\'" );
+				.should.be.rejectedWith( "Failed to instantiate model \'test\'" );
 		} );
 
 		after( function() {
@@ -98,13 +99,13 @@ describe( "Dispatch", function() {
 		} );
 	} );
 
-	describe( "dispatching to existing actor", function() {
-		var queue, lookup, manager, dispatcher, actors, instance, command, event;
+	describe( "dispatching to existing model", function() {
+		var queue, lookup, manager, dispatcher, models, instance, command, event;
 
 		before( function() {
 			var metadata = {
 				test: {
-					actor: {
+					model: {
 						type: "test"
 					},
 					state: {
@@ -113,19 +114,19 @@ describe( "Dispatch", function() {
 					commands: {
 						doAThing: [
 							[
-								function( actor ) {
-									return actor.canDo;
+								function( model ) {
+									return model.canDo;
 								},
-								function( actor, thing ) {
-									return [ { type: "thingDid", degree: thing.howMuch } ];
+								function( model, thing ) {
+									return [ { type: "test.thingDid", degree: thing.howMuch } ];
 								}
 							]
 						]
 					},
 					events: {
 						thingDid: [
-							[ true, function( actor, did ) {
-								actor.doneDidfulness = did.degree;
+							[ true, function( model, did ) {
+								model.doneDidfulness = did.degree;
 							} ]
 						]
 					}
@@ -139,8 +140,8 @@ describe( "Dispatch", function() {
 
 			loader( fount, metadata )
 				.then( function( list ) {
-					actors = list;
-					instance = _.cloneDeep( actors.test.metadata );
+					models = list;
+					instance = _.cloneDeep( models.test.metadata );
 					instance.state = { id: 100, canDo: true };
 					command = { type: "doAThing", howMuch: "totes mcgoats" };
 					event = { type: "thindDid", degree: "totes mcgoats" };
@@ -149,7 +150,7 @@ describe( "Dispatch", function() {
 						doAThing: [ "test" ],
 						thingDid: [ "test" ]
 					};
-					dispatcher = dispatcherFn( lookup, manager, actors, queue );
+					dispatcher = dispatcherFn( sliver, lookup, manager, models, queue );
 				} );
 		} );
 
@@ -158,13 +159,13 @@ describe( "Dispatch", function() {
 				.should.eventually.partiallyEql(
 					[
 						{
-							actor: _.omit( instance.state, "lastCommandId", "lastCommandHandledOn" ),
+							model: _.omit( instance.state, "lastCommandId", "lastCommandHandledOn" ),
 							events: [
 								{
-									actorType: "test",
-									correlationId: 100,
+									modelType: "test",
+									modelId: 100,
 									initiatedBy: "doAThing",
-									type: "thingDid",
+									type: "test.thingDid",
 									degree: "totes mcgoats"
 								}
 							],
@@ -179,7 +180,7 @@ describe( "Dispatch", function() {
 				.should.eventually.resolve;
 		} );
 
-		it( "should mutate actor state", function() {
+		it( "should mutate model state", function() {
 			instance.state.doneDidfulness.should.eql( "totes mcgoats" );
 		} );
 

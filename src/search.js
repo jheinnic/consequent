@@ -6,15 +6,15 @@ function getAdapter( adapters, lib, type ) {
 	return adapter;
 }
 
-function find( actors, adapters, lib, type, criteria ) {
+function find( models, adapters, lib, type, criteria ) {
 	var adapter = getAdapter( adapters, lib, type );
 	return adapter.find( criteria );
 }
 
-module.exports = function( actors, searchLib ) {
+module.exports = function( models, searchLib ) {
 	var adapters = {};
 	return {
 		adapters: adapters,
-		find: find.bind( null, actors, adapters, searchLib )
+		find: find.bind( null, models, adapters, searchLib )
 	};
 };

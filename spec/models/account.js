@@ -14,27 +14,41 @@ function deposit( account, amount ) {
 }
 
 function open( account, accountHolder, accountNumber, initialDeposit ) {
-	return [
-		{
-			type: "account.opened",
-			accountHolder: accountHolder,
-			accountNumber: accountNumber
-		},
-		{
-			type: "account.deposited",
-			initial: true,
-			amount: initialDeposit
-		}
-	];
+	if( !isOpen(account ) ) {
+		return [
+			{
+				type: "account.opened",
+				accountHolder: accountHolder,
+				accountNumber: accountNumber
+			},
+			{
+				type: "account.deposited",
+				initial: true,
+				amount: initialDeposit
+			}
+		];
+	} else {
+		return [];
+	}
 }
 
 function withdraw( account, amount ) {
-	var events = [];
-	events.push( {
-		type: "account.withdrawn",
-		amount: amount
-	} );
-	return events;
+	if( canWithdraw( account, amount ) ) {
+		return [ {
+			type: "account.withdrawn",
+			amount: amount
+		} ];
+	} else if( account.open ) {
+		return {
+			type: "account.insufficientFunds",
+			amount: amount
+		}
+	} else {
+		return {
+			type: "account.unavailableFunds",
+			open: false
+		}
+	}
 }
 
 // PREDICATES

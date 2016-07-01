@@ -7,33 +7,33 @@ var util = require( "./util" );
 var log = require( "./log" )( "consequent.loader" );
 
 // returns a list of resource files from a given parent directory
-function getActors( filePath ) {
+function getModels( filePath ) {
 	if ( fs.existsSync( filePath ) ) {
-		return glob( filePath, [ "*_actor.js" ] );
+		return glob( filePath, [ "*_model.js" ] );
 	} else {
-		var error = "Could not load actors from non-existent path '" + filePath + "'";
+		var error = "Could not load models from non-existent path '" + filePath + "'";
 		log.error( error );
 		return when.reject( new Error( error ) );
 	}
 }
 
 // loads a module based on the file path
-function loadModule( actorPath ) {
+function loadModule( modelPath ) {
 	try {
-		var key = path.resolve( actorPath );
+		var key = path.resolve( modelPath );
 		delete require.cache[ key ];
-		return require( actorPath );
+		return require( modelPath );
 	} catch ( err ) {
-		log.error( "Error loading actor module at %s with %s", actorPath, err.stack );
+		log.error( "Error loading model module at %s with %s", modelPath, err.stack );
 		return undefined;
 	}
 }
 
-// load actors from path and returns the modules once they're loaded
-function loadActors( fount, actors ) {
+// load models from path and returns the modules once they're loaded
+function loadModels( fount, models ) {
 	var result;
 
-	function addActor( acc, instance ) {
+	function addModel( acc, instance ) {
 		var factory = _.isFunction( instance.state ) ?
 			instance.state :
 			function() {
@@ -43,24 +43,24 @@ function loadActors( fount, actors ) {
 			processHandles( instance );
 		}
 		catch ( e ) {
-			log( "Error processing actor %s with %s", instance.actor.type, e.stack ? e.stack : e );
+			log( "Error processing model %s with %s", instance.model.type, e.stack ? e.stack : e );
 		}
-		acc[ instance.actor.type ] = {
+		acc[ instance.model.type ] = {
 			factory: factory,
 			metadata: instance
 		};
 		return acc;
 	}
 
-	function onActors( list ) {
+	function onModels( list ) {
 		function onInstances( instances ) {
-			return _.reduce( instances, addActor, {} );
+			return _.reduce( instances, addModel, {} );
 		}
 
 		var modules = _.filter( list );
 		var promises = _.map( modules, function( modulePath ) {
-			var actorFn = loadModule( modulePath );
-			return fount.inject( actorFn );
+			var modelFn = loadModule( modulePath );
+			return fount.inject( modelFn );
 		} );
 
 		return when
@@ -68,33 +68,33 @@ function loadActors( fount, actors ) {
 			.then( onInstances );
 	}
 
-	if ( _.isString( actors ) ) {
-		var filePath = actors;
+	if ( _.isString( models ) ) {
+		var filePath = models;
 		if ( !fs.existsSync( filePath ) ) {
 			filePath = path.resolve( process.cwd(), filePath );
 		}
-		return getActors( filePath )
-			.then( onActors );
-	} else if ( _.isArray( actors ) ) {
-		result = _.reduce( actors, function( acc, instance ) {
-			addActor( acc, instance );
+		return getModels( filePath )
+			.then( onModels );
+	} else if ( _.isArray( models ) ) {
+		result = _.reduce( models, function( acc, instance ) {
+			addModel( acc, instance );
 			return acc;
 		}, {} );
 		return when.resolve( result );
-	} else if ( _.isObject( actors ) ) {
-		result = _.reduce( actors, function( acc, instance ) {
-			addActor( acc, instance );
+	} else if ( _.isObject( models ) ) {
+		result = _.reduce( models, function( acc, instance ) {
+			addModel( acc, instance );
 			return acc;
 		}, {} );
 		return when.resolve( result );
-	} else if ( _.isFunction( actors ) ) {
-		result = actors();
+	} else if ( _.isFunction( models ) ) {
+		result = models();
 		if ( !result.then ) {
 			result = when.resolve( result );
 		}
 		return result.then( function( list ) {
 			return _.reduce( list, function( acc, instance ) {
-				addActor( acc, instance );
+				addModel( acc, instance );
 				return when.resolve( acc );
 			}, {} );
 		} );
@@ -154,4 +154,4 @@ function processHandles( instance ) {
 	}, {} );
 }
 
-module.exports = loadActors;
+module.exports = loadModels;

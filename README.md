@@ -1,95 +1,98 @@
 # Consequent
-An actor based, event-sourcing library.
+An actor model based, event-sourcing library.
 
 Conequent's goal is to provide a consistent approach to event sourcing while avoiding I/O implementation details (messaging transports and storage). Consequent is very opinionated and works best when models are implemented as modules of pure functions.
 
 #### Please read the [concepts section](#concepts) before getting started.
 
 ## Use
-Initialization requires three I/O adapters with the opportunity to enhance behavior with an additional 3. The API for each is specified under the [I/O Adapters](#io-adapters) section.
+Initialization requires two I/O adapters with the opportunity to enhance behavior with several more. The API for each is specified under the [I/O Adapters](#io-adapters) section.
 
 ```javascript
 var fount = require( "fount" );
 var consequentFn = require( "consequent" );
 
 // minimum I/O adapters
-// actor stores
-var actors = require( ... );
+// model storage
+var models = require( ... );
 // event store
 var events = require( ... );
-// message bus
-var messages = require( ... );
 
 var consequent = consequentFn(
 	{
-		actorStore: actors,
+		modelStore: models,
 		eventStore: events,
-		messageBus: messages,
 		fount: fount
 	} );
 
+// message bus
+var messages = require( ... );
 
 // additional I/O adapters shown
 // coordination provider
 var coordinator = require( ... );
-// actorCache
-var actorCache = require( ... );
+
+// modelCache
+var modelCache = require( ... );
+
 // eventCache
 var eventCache = require( ... );
+
 // searchProvider
 var search = require( ... );
 
 var consequent = consequentFn(
 	{
-		actorStore: actors,
-		actorCache: actorCache,
+		modelStore: models,
+		modelCache: modelCache,
 		eventStore: events,
 		eventCache: eventCache,
 		messageBus: messages,
 		coordinator: coordinator,
 		search: search,
-		actorPath: "./actors" // optional path to actor modules
+		modelPath: "./models" // optional path to model modules
 	} );
 ```
 
 ## API
 
-### apply( actor, events )
-Applies a series of events to an actor instance. The promise returned will resolve to a new instance of the actor that is the result of applying ordered events against the actor's initial state or reject with an error.
+### apply( model, events )
+Applies a series of events to a model instance. The promise returned will resolve to a new instance of the model that is the result of applying ordered events against the model's initial state or reject with an error.
 
 > Note: If you use this call to apply events from an event stream, keep in mind that it does not protect you from events arriving out of order.
 
-### fetch( actorType, actorId, [ eventSpecifications ] )
-Get the actor's current state by finding the latests snapshot and applying events since that snapshot was taken. The promise returned will either resolve to the actor or reject with an error.
+### fetch( modelType, modelId, [ eventSpecifications ] )
+Get the model's current state by finding the latests snapshot and applying events since that snapshot was taken. The promise returned will either resolve to the model's latest state or reject with an error.
 
-Optionally, `eventSpecifications` can be supplied such that events from other actors' event streams will be included; a common use case when fetching a read model that requires events from multiple actors.
+Optionally, `eventSpecifications` can be supplied such that events from other models' event streams will be included; a common use case when fetching a view model that requires events from multiple domain models.
 
 ```js
 // example event specifications
 
 // when looking up events by an index defined on the event
 [ {
-	actor: "actorName",
+	model: "modelName",
 	index: { name: "index_name", value: "index_value" }
 } ]
 
 // when looking up events by search criteria
 [ {
-	actor: "actorName",
+	model: "modelName",
 	where: { // see the find criteria for specifics on how to specify criteria
 		property: "value"
 	}
 } ]
 ```
 
-### handle( actorId, topic|type, command|event )
-Process a command or event and return a promise that resolves to the originating message, the actor snapshot and resulting events. The promise will reject if any problems occur while processing the message.
+### handle( modelId, topic|type, command|event )
+Process a command or event and return a promise that resolves to the originating message, the model snapshot and resulting events. The promise will reject if any problems occur while processing the message.
 
 Successful resolution should provide a hash with the following structure:
 ```javascript
 {
 	message: {},
-	actor: {},
+	original: {}, // the snapshot (if one existed) of the model before applying the result of the command
+	model: {}, // the state that results from applying the events resulting from the command
 	events: []
 }
 ```
@@ -100,162 +103,92 @@ Rejection will give an error object with the following structure:
 	rejected: true,
 	reason: "",
 	message: {},
-	actor: {}
+	model: {}
 }
 ```
 
-> Note: the actor property will be a clone of the latest snapshot without the events applied.
-
 ### find( type, criteria )
-Finds an actor of `type` matching the `criteria` provided that a search adapter has been supplied capable of doing so.
+Returns a promise for model instances of `type` that match the `criteria` provided if a search adapter has been supplied capable of doing so. If no search adapter exists, then the promise is rejected instead.
 
-### mapEvents( actorType, actorId, events )
-Takes events produced by another actor and rewrites them to a new event store. The intended use case for this is for read models that need access to a broad range of events that would be prohibitively expensive or difficult to acquire at read time via `eventSpecifications`.
+### mapEvents( modelType, modelId, events )
+Takes events and rewrites them to modelType's event store owned by modelId. The intended use case for this is for view models that need access to a broad range of event streams that would be prohibitively expensive or difficult to acquire at read time via `eventSpecifications`.
 
-## Actor
-Consequent will load actor modules ending with `_actor.js` from an `./actors` path. This location can be changed during initialization. The actor module's function should return a hash with the expected structure which includes the following properties:
+## Model
+Consequent will load model modules ending with `_model.js` from an `./models` path. This location can be changed during initialization. The model module's function should return a hash with the expected structure which includes the following properties:
 
- * `actor` - metadata and configuration properties
- * `state` - default state hash or a factory to initialize the actor instance
+ * `model` - metadata and configuration properties
+ * `state` - default state hash or a factory to initialize the model instance
  * `commands` - command processors
  * `events` - event processors
 
-Any arguments listed in the actor module's exported function will be supplied via `fount`.
+Any arguments listed in the model module's exported function will be supplied via `fount`.
 
-### Actor fields
+### Model fields
 
 #### Required field
 
- * `type` - provides a name/namespace for the actor
+ * `type` - provides a name/namespace for the model
 
 #### Optional fields
 
  * `eventThreshold` - set the number of events that will trigger a new snapshot
- * `snapshotDuringPartition` - sets whether snapshots can be created during partitions*
- * `snapshotOnRead` - sets whether or not snapshots should be created on reads
- * `aggregateFrom` - a list of actor types to aggregate events from - this is advanced
+ * `snapshotDuringPartition` - sets whether snapshots can be created during partitions, default is false*
+ * `snapshotOnRead` - sets whether or not snapshots should be created on reads, default is false for domain models
 
->* It is the actor store's responsibility to determine this, in most cases, databases don't provide this capability.
+>* It is the model store's responsibility to determine if this is possible, in most cases, databases don't provide this capability.
 
 ### State fields
-Consequent will add the following fields to actor state:
+Consequent will add the following fields to model state:
 
  * `id`
- * `vector`
- * `ancestor`
- * `lastEventId`
- * `lastCommandId`
- * `lastCommandHandledOn` - ISO8601
- * `lastEventAppliedOn` - ISO8601
+ * `_vector`
+ * `_version`
+ * `_ancestor`
+ * `_lastEventId`
+ * `_lastCommandId`
+ * `_lastCommandHandledOn` - ISO8601
+ * `_lastEventAppliedOn` - ISO8601
 
 Other than id, none of these fields should _ever_ be manipulated directly.
 
 ## Messages (Commands & Events)
-Consequent supports two types of messages - commands and events. Commands represent a message that is processed conditionally and results in one or more events as a result. Events represent something that's already taken place and get applied against the actor's state.
+Consequent supports two types of immutable messages - commands and events. Commands represent a message that is processed conditionally and results in one or more events as a result. Events represent something that's already taken place and are unconditionally applied to the model's state.
 
-### Caution - events should not result in events
-Consequent may replay the same event against an actor many times in a system before the resulting actor state is captured as a snapshot. There are no built-in mechanisms to identify or eliminate events that result from replaying an event multiple times.
+### Caution - events should not result in events or commands
+Consequent may replay the same event against a model many times in a system before the resulting model state is captured as a snapshot. There are no built-in mechanisms to identify or eliminate events that result from replaying an event multiple times.
 
 ### Definition
-The `commands` and `events` properties should be defined as a hash where each key is the message type/topic and the value can take one of three possible formats. Each definition has four properties that consequent uses to determine when and how to call the handler in question.
+The `commands` and `events` properties should be defined as a hash where each key is the message type/topic and the value is a function from an implementation module. 
 
- * when - a boolean value, predicate function or state that controls when the handler is called
- * then - the handler function to call
- * exclusive - when true, the first handler with a passing when will be the only handler called
- * map - a boolean or argument to message map that will cause consequent to map message properties to handler/predicate arguments
+### Command and Event Handler functions
+A command handler returns an array of events or a promise that resolves to one. An event handler mutates the model's state directly based on the event and returns nothing. Command handlers may be asynchronous and result in a promise. Event application _must be synchronous_ and should never rely on outside I/O.
 
-#### Predicates
-The form of a predicate function can take one of two forms:
-
-```js
-// when not using a map
-function( state, message ) {
-	// return true or false based on state and the message
-}
-
-// when using a map
-// if map is a boolean
-//		then the argument names should match message property names
-// if map is a hash
-//		then the argument names would be the keys and message property names would be the values
-function( state, property1, property2 ) {
-	// return true or false based on state and the arguments provided
-}
-```
-
-When the predicate is a string, the handler will be invoked when the actor's state has a `state` property that matches.
-
-#### Hash definition
-
-> Note: while the only required field is `then`, if that's all you need, just provide the handler function by itself (see handler function only).
-
-```js
-{
-	when: boolean|predicate|state name (defaults to true),
-	then: handler function
-	exclusive: boolean (defaults to true),
-	map: argument->property map or false (defaults to true)
-}
-```
-
-#### Array definition
-
-This is a short-hand form of the hash form. It's probably not worth sacrificing clarity to use it, but here it is:
-
-```js
-	[ when, then, exclusive, map ]
-```
-
-#### Handler function only
-If the default values for `when`, `exclusive` and `map` are what you need, just provide the function instead of a hash with only the `then` property.
-
-### Handler functions
-A command handler returns an array of events or a promise that resolves to one. An event handler mutates the actor's state directly based on the event and returns nothing. Command handlers may be asynchronous and result in a promise. Event application _must be synchronous_ and should never rely on outside I/O.
-
-> Note: Event application isn't implemented as strictly _pure_ because Consequent is already constructing a new instance of the actor for you to apply the events to. Consequent was built with stateless services in mind, so there should be no ambient state pollution to worry about during event application.
+> Note: Event application isn't implemented as strictly _pure_ because Consequent is already constructing a new instance of the model for you to apply the events to. Consequent was built with stateless services in mind, so there should be no ambient state to pollute event application.
 
 _Example_
 ```javascript
 // command handler example
-function handleCommand( actor, command ) {
+function handleCommand( model, command ) {
 	return [ { type: "counterIncremented" } ];
 }
 
 // event handler example
-function handleCounterIncremented( actor, event ) {
-	actor.counter = actor.counter + event.amount;
+function handleCounterIncremented( model, event ) {
+	model.counter = model.counter + event.amount;
 }
 ```
 
-#### Example
-In this case, the when is a predicate used to determine which handler(s) (specified by the `then` property) should be called.
+#### Examples
 
-```javascript
-var account = require( "./account" ); // model
-...
-	commands: {
-		withdraw: [
-			{ when: account.sufficientBalance, then: account.makeWithdrawal },
-			{ when: account.insufficientBalance, then: account.denyWithdrawal }
-		]
-	},
-	events: {
-		withdrawn: [
-			{ when: account.sufficientBalance, then: account.withdraw },
-			{ when: account.insufficientBalance, then: account.overdraft }
-		]
-	}
-```
-
-__Actor Format - State as a hash of defaults__
+__Model Format - State as a hash of defaults__
 ```javascript
 
-// predicates, command handlers and event handlers should be placed outside the actor defintion
+// predicates, command handlers and event handlers should be placed outside the model defintion
 // in a module that defines the model using pure functions
 
 module.exports = function() {
 	return {
-		actor: { // defaults shown
+		model: { // defaults shown
 			type: "", // required - no default
 			eventThreshold: 100,
 			snapshotDuringPartition: false,
@@ -281,7 +214,7 @@ module.exports = function() {
 };
 ```
 
-__Actor Format - State as a factory method__
+__Model Format - State as a factory method__
 ```javascript
 
 // a factory method is called with an id and can return a state hash or promise for one.
@@ -290,7 +223,7 @@ __Actor Format - State as a factory method__
 
 module.exports = function() {
 	return {
-		actor: { // defaults shown
+		model: { // defaults shown
 			type: "", // required - no default
 			eventThreshold: 100,
 			snapshotDuringPartition: false,
@@ -314,12 +247,12 @@ module.exports = function() {
 ```
 
 ## Event
-Events must specify a dot delimited `type` property where the first part is the name of the actor that will "own" the event. In almost every case, this will be the name of the actor producing the event. Below is a list of properties that will exist on an event after consequent has received the event:
+Events must specify a dot delimited `type` property where the first part is the name of the model that will "own" the event. In almost every case, this will be the name of the model producing the event. Below is a list of properties that will exist on an event after consequent has received the event:
 
 ### Required Properties
 ```js
 {
-	type: "actor.eventName"
+	type: "model.eventName"
 }
 ```
 
@@ -327,69 +260,73 @@ Events must specify a dot delimited `type` property where the first part is the 
 ```js
 {
 	id: "", // this will be a generated flake id for this event
-	actorType: "", // the type of the actor the event was generated for
-	correlationId: "actorId", // this is the addressable identity of the owning actor
-	createdOn: "", // UTC ISO date time string when event was created
-	initiatedBy: "", // the command type/topic that triggered the event
-	initiatedById: "", // the id of the message that triggered the event
+	_modelType: "", // the type of the model the event was generated for
+	_modelId: "modelId", // this is the addressable identity of the owning model
+	_createdOn: "", // UTC ISO date time string when event was created
+	_createdBy:  "", //
+	_createdById:  "", //
+	_createdByVector:  "", //
+	_createdByVersion: "", //
+	_initiatedBy: "", // the command type/topic that triggered the event
+	_initiatedById: "", // the id of the message that triggered the event
 }
 ```
 
-### optional properties
+### Optional Properties
 ```js
 {
-	actorType: "", // override this to produce an event for another actor
-	correlationId: "", // override to control the id of the actor the event is created for
-	indexBy: { // if indexing by values not already defined on the event
+	_modelType: "", // override this to produce an event for another model
+	_modelId: "", // override to control the id of the model the event is created for
+	_indexBy: { // if indexing by values not already defined on the event
 		indexName: "indexValue" // key value to index the event by
 	},
-	indexBy: [ // if indexing by event properties
+	_indexBy: [ // if indexing by event properties
 		indexName, // the name of the event property to index by for future lookup
 	]
 }
 ```
 
 ### Event Indexing
-Event indexing exists so that events can be easily included in read models that require event streams from multiple actors. This happens frequently in parent-child associations. Indexing the events with the parent id will make it possible to pull in child events 
+Event indexing exists so that events can be easily included in read models that require event streams from multiple models. This happens frequently in parent-child associations. Indexing the events with the parent id will make it possible to pull in child events 
 
 # Concepts
 Here's a breakdown of the primitives involved in this implementation:
 
 ## Domain Models vs. View Models
-Actors can represent either a domain model (an actor that processes commands and produces events), or a view model (an actor that only aggregates events produced by other models). The intent is to represent application behavior and features through domain models and use view models to satisfy read behavior for the application.
+Models can represent either a domain model (an actor that processes commands and produces events), or a view model (a model that only aggregates events produced by domain models). The intent is to represent application behavior and features through domain models and use view models to satisfy read behavior for the application.
 
-This satisfies CQRS at an architectural level in that domain model actors and view model actors can be hosted in separate processes that use specialized transports/topologies for communication.
+This satisfies CQRS at an architectural level in that domain model actors and view models can be hosted in separate processes that use specialized transports/topologies for communication.
 
-## Event Sourced Actors
+## Event Sourced Domain Models Implemented as Actors
 This approach borrows from event sourcing, CQRS and CRDT work done by others. It's not original, but perhaps a slightly different take on event sourcing.
 
+### The Importance of Isolation
+The expectation in this approach is that the domain models' messages will be processed in isolation at both a machine and process level. Another way to put this is that no two command messages for an actor should be processed at the same time in an environment. Consequent cannot provide this guarantee in the event of a network partition and does provide some mechanisms to help you avoid or detect these situations but it is up to implementing services to understand and handle them.
+
 ### Events
-An event is generated as a result of an actor processing a comand message. Actor mutation happens later as a result of applying events against the actor.
+An event is generated as a result of an actor processing a comand message. State mutation happens later as a result of applying events against the model.
 
-Each event will have a correlation id to specify which actor produced the event. It will also have an event id, timestamp and initiatedBy field to indicate the command message id and type that triggered the event creation.
+Each event will have a model id to specify which model produced the event. It will also have an event id, timestamp and initiatedBy field to indicate the command message id and type that triggered the event creation.
 
-Any time an actor's present state is required (on read or on processing a command), events are loaded and ordered by time + event id (as a means to get some approximation of total ordering) and then applied to the last actor state to provide a 'best known current actor state'.
+Any time a model's latest state is required, events are loaded and ordered by time + event id (as a means to get some approximation of total ordering) and then applied to the model's latest available snapshot to provide a 'best available state'.
 
-### Actors
-An actor is identified by a unique id and a vector clock. Instead of mutating and persisting actor state after each message, actors generate events when processing a message. Before processing a message, an actor's last available persisted state is loaded from storage, all events generated since the actor was persisted are loaded and applied to the actor.
+### Model Snapshots
+An model's snaphsot is identified by a unique id and a vector clock. Instead of mutating and persisting model state after each command message, models generate events. Before processing a command message, a model's last snapshot is loaded from storage, all events since that snapshot was persisted are loaded and applied then applied to the model.
 
-After some threshold of applied events is crossed, the resulting actor's state will be persisted with a new vector clock (referred to as a snapshot) to prevent needing to replay these events again. This provides a means of preventing unbound event replay being required to determine present state.
-
-__The Importance of Isolation__
-The expectation in this approach is that actors' messages will be processed in isolation at both a machine and process level. Another way to put this is that no two command messages for an actor should be processed at the same time in an environment. The exception to this assumption is network partitions. Read on to see how this approach deals with partitions.
+After some threshold of applied events is crossed, the resulting model's state will be persisted with a new vector clock to create a new snapshot. This prevents replaying the same events every time the model is read and from having to read an ever-growing, unbounded list of events in order to determine the model's state over time.
 
 ### Divergent Replicas
-In the event of a network partition, if commands or events are processed for the same actor on more than one partition, replicas can be created. These replicas may result in multiple copies of the same actor with different state. When this happens, multiple actors will be retrieved when the next message is processed.
+In the event of a network partition, if commands or events are processed for the same actor on more than one partition, replicas can be created if snapshots are allowed. These replicas will result in multiple copies of the same model with different state. When this happens, multiple snapshots should be retrieved when the next message is processed.
 
-To resolve this divergence, the system will walk the actors' ancestors to find the latest shared ancestor and apply all events that have occured since that ancestor to produce a 'correct' actor state.
+To resolve this divergence, the system will walk the snapshot's ancestors to find the first shared ancestor and apply all events that have occured since that ancestor to produce a new, merged snapshot.
 
 ### Ancestors
-An ancestor is a previous snapshot identified by the combination of the actor id and the vector clock. Ancestors exist primarily to resolve divergent replicas that may occur during a partition.
+An ancestor is a previous snapshot identified by the combination of the model id and the vector clock. Ancestors exist primarily to resolve divergent replicas that may occur during a partition.
 
 > Note - some persistence adapaters may include configuration to control what circumstances snapshots (and therefore ancestors) can be created under. Avoiding divergence is preferable but will trade performance for simplicity if partitions are frequent or long-lived.
 
 ### Event Packs
-Whenever a new snapshot is created, all events that were applied will be stored as a single record identified by the actor's vector and id. Whenever divergent actors are being resolved, event packs will be loaded to provide a deterministic set of events to apply against the common ancestor.
+Event packs are an optional additional level of safety that can be enabled in order to preserve history and used when resolving divergence. Whenever a new snapshot is created, all events that were applied will be stored as a single record identified by the model's vector and id. Whenever divergent actors are being resolved, event packs will be loaded to provide a deterministic set of events to apply against the common ancestor.
 
 ### Vector Clocks
 The ideal circumstances should limit the number of nodes that would participate in creation of a snpashot. A small set of nodes participating in mutation of a record should result in a manageable vector clock. In reality, there could be a large number of nodes participating over time. The vector clock library in use allows for pruning these to keep them managable.
@@ -399,11 +336,8 @@ The ideal circumstances should limit the number of nodes that would participate 
 ### k-ordered ids
 I just liked saying k-ordered. It just means "use flake". This uses our node library, [sliver](https://npmjs.org/sliver).
 
-## If LWW Is All You Need
-Event sourcing is a bit silly if you don't mind losing data. Chances are if LWW is fine then you're dealing with slowly changing dimensions that have very low probability of conflicting changes.
-
 ## If Only Strong Consistency Will Do
-This will be supported one day. For now, you shouldn't use this library for this case. This library is intended to prioritize availability and partition tolerance and sacrifices consistency by throwing it straight out the window.
+If you want strong consistency guarantees, set your event threshold to 1. A snapshot will get created for every command. You'll need to set up a job to prune snapshots over time, but you'll get consistency.
 
 # I/O Adapters
 
@@ -412,69 +346,70 @@ This section defines the expected behavior and API for each type of I/O adapter.
 --
 
 # Storage Adapters
-Consequent provides a consistent approach to event sourcing but avoids any direct I/O. This allows any application to use it with any storage technology that an adapter exists for.
+Consequent provides a consistent approach to event sourcing but avoids any direct I/O. This allows any application to use it with any storage technology that an adapter exists for. All adapter calls should return a promise.
 
-All adapter calls should return a promise.
+Many of the calls are optional and only require that the adapter reject the promise and specify that they do not support tehe feature in their README.
 
 ## Event store
 Responsibilities:
 
  * store events
- * retrieve events for an actor since an event id
+ * retrieve events for an model since an event id
  * store event packs
  * retreive, unpack and merge event packs
 
 ### API
 
-#### create( actorType )
-Creates an eventStore instance for a specific type of actor.
+#### create( modelType )
+Creates an eventStore instance for a specific type of model.
 
 #### findEvents( criteria, lastEventId ) OPTIONAL
 Retrieve events based on a set of criteria. When not implementing this call, the event store should resolve this to a rejected promise explaining that this is not or cannot be implemented.
 
-#### getEventsFor( actorId, lastEventId )
-Retrieve events for the `actorId` that occurred since the `lastEventId`.
+#### getEventsFor( modelId, lastEventId )
+Retrieve events for the `modelId` that occurred since the `lastEventId`.
 
 #### getEventsByIndex( indexName, indexValue, lastEventId ) OPTIONAL
 Retrieve events based on a previously established index value for the event. When not implementing this call, the event store should resolve this to a rejected promise explaining that this is not or cannot be implemented.
 
-#### getEventPackFor( actorId, vectorClock )
-Fetch and unpack events that were stored when the snapshot identified by `actorId` and `vectorClock` was created.
+#### getEventPackFor( modelId, vectorClock ) OPTIONAL
+Fetch and unpack events that were stored when the snapshot identified by `modelId` and `vectorClock` was created. When not implementing this call, the event store should resolve this to a rejected promise explaining that this is not or cannot be implemented.
 
-#### storeEvents( actorId, events )
-Store events for the actor.
+#### storeEvents( modelId, events )
+Store events for the model.
 
-#### storeEventPack( actorId, vectorClock, events )
-Pack and store the events for the snapshot identified by `actorId` and `vectorClock`.
+#### storeEventPack( modelId, vectorClock, events ) OPTIONAL
+Pack and store the events for the snapshot identified by `modelId` and `vectorClock`.
 
-## Actor store
+## Model store
 Responsibilities
 
- * retrieve the latest actor (snapshot) by id; must provide replicas/siblings
- * store an actor snapshot
- * create & store ancestors
+ * retrieve the latest model snapshot by id; must provide replicas/siblings
+ * store an model's snapshot
  * retrieve ancestors
  * detect ancestor cycles & other anomalies
 
+> Note: everything related to partition tolerance is optional
+
 ### API
 
-#### create( actorType )
-Creates an actor store instance for a specific type of actor.
+#### create( modelType )
+Creates an model store instance for a specific type of model.
 
-#### fetch( actorId )
-Return the latest snapshot for the `actorId`. Must provide replicas/siblings if they exist. By default, all events that belong to actorId since the last snapshot will be included in determining the actor's state. 
+#### fetch( modelId )
+Return the latest snapshot for the `modelId`. Must provide replicas/siblings if they exist. By default, all events that belong to modelId since the last snapshot will be included in determining the model's state. 
 
-#### findAncestor( actorId, siblings, ancestry )
-Search for a common ancestor for the actorId given the siblings list and ancestry. Likely implemented as a recursive call. Must be capable of identifying cycles in snapshot ancestry. Should resolve to nothing or the shared ancestor snapshot.
+#### findAncestor( modelId, siblings, ancestry ) OPTIONAL
+Search for a common ancestor for the modelId given the siblings list and ancestry. Likely implemented as a recursive call. Must be capable of identifying cycles in snapshot ancestry. Should resolve to nothing or the shared ancestor snapshot.
 
-#### store( actorId, vectorClock, actor )
+#### store( modelId, vectorClock, model )
 Store the latest snapshot and create ancestor.
 
 # Search Adapter
 
 > ! Experimental ! - this API is highly experimental and subject to changes.
 
-The goal behind this adapter is to provide an abstraction that various storage implementations can implement.
+The goal behind this adapter is to provide a search abstraction that various storage implementations can implement. Please keep in mind that a search executed against snapshots will only be as accurate as the latest snapshots and not include changes from events that have not been persistd to a snapshot yet.
 
 ## API
 
@@ -575,48 +510,48 @@ Responsibilities:
 
  * store recent events
  * flush/remove events once applied to a snapshot
- * store recent eventpacks
- * retrieve, unpack and merge event packs
+ * store recent eventpacks (OPTIONAL)
+ * retrieve, unpack and merge event packs (OPTIONAL)
 
 ### API
 > Note - the API is presently identical to the event store but implementation may choose to opt-out of features by returning a promise that resolves to undefined to cause Consequent to call through to the storage layer.
 
-#### create( actorType )
-Creates an eventCache instance for a specific type of actor.
+#### create( modelType )
+Creates an eventCache instance for a specific type of model.
 
-#### getEventsFor( actorId, lastEventId )
-Retrieve events for the `actorId` that occurred since the `lastEventId`.
+#### getEventsFor( modelId, lastEventId )
+Retrieve events for the `modelId` that occurred since the `lastEventId`.
 
-#### getEventPackFor( actorId, vectorClock )
-Fetch and unpack events that were stored when the snapshot identified by `actorId` and `vectorClock` was created.
+#### getEventPackFor( modelId, vectorClock )
+Fetch and unpack events that were stored when the snapshot identified by `modelId` and `vectorClock` was created.
 
-#### storeEvents( actorId, events )
-Store events for the actor.
+#### storeEvents( modelId, events )
+Store events for the model.
 
-#### storeEventPack( actorId, vectorClock, events )
-Pack and store the events for the snapshot identified by `actorId` and `vectorClock`.
+#### storeEventPack( modelId, vectorClock, events )
+Pack and store the events for the snapshot identified by `modelId` and `vectorClock`.
 
-## Actor cache
+## Model cache
 Responsibilities:
 
- * keep most recent actor/snapshot in cache
- * retrieve an actor by id
+ * keep most recent model/snapshot in cache
+ * retrieve an model by id
  * cache recent replicas/siblings
  * cache recent snapshots
 
 ### API
 > Note - the API is presently identical to the event store but implementation may choose to opt-out of features by returning a promise that resolves to undefined to cause Consequent to call through to the storage layer.
 
-#### create( actorType )
-Creates an actor cache instance for a specific type of actor.
+#### create( modelType )
+Creates an model cache instance for a specific type of model.
 
-#### fetch( actorId )
-Return the latest snapshot for the `actorId`. Must provide replicas/siblings if they exist.
+#### fetch( modelId )
+Return the latest snapshot for the `modelId`. Must provide replicas/siblings if they exist.
 
-#### findAncestor( actorId, siblings, ancestry )
-Search for a common ancestor for the actorId given the siblings list and ancestry. Likely implemented as a recursive call. Must be capable of identifying cycles in snapshot ancestry. Should resolve to nothing or the shared ancestor snapshot.
+#### findAncestor( modelId, siblings, ancestry )
+Search for a common ancestor for the modelId given the siblings list and ancestry. Likely implemented as a recursive call. Must be capable of identifying cycles in snapshot ancestry. Should resolve to nothing or the shared ancestor snapshot.
 
-#### store( actorId, vectorClock, actor )
+#### store( modelId, vectorClock, model )
 Store the latest snapshot and create ancestor.
 
 # Coordination Adapter
@@ -634,7 +569,7 @@ Acquires a lock for an id. When in use, Consequent will not attempt to process a
 Release the lock to a specific id.
 
 # Message Adapter
-The message adapters job is to plug a potential stream of incoming commands and events into Consequent's actors while also providing a means to publish events that result from processing commands.
+The message adapters job is to plug a potential stream of incoming commands and events into Consequent's models while also providing a means to publish events that result from processing commands.
 
 The message adapter should handle all transport related concerns.
 

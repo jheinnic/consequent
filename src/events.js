@@ -2,10 +2,10 @@ var _ = require( "lodash" );
 var format = require( "util" ).format;
 var log = require( "./log" )( "consequent.events" );
 
-function remap( sliver, actorType, actorId, event ) {
+function remap( sliver, modelType, modelId, event ) {
 	event.id = event.id || sliver.getId();
-	event.correlationId = actorId;
-	event.actorType = actorType;
+	event.modelId = modelId;
+	event.modelType = modelType;
 }
 
 function getAdapter( adapters, lib, io, type ) {

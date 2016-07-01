@@ -24,8 +24,8 @@ function mapMessageToCall( method, map ) {
 	if ( map === false || map === undefined ) {
 		return method;
 	} else if ( _.isObject( map ) ) {
-		return function( actor, message ) {
-			var appliedArgs = [ actor ];
+		return function( model, message ) {
+			var appliedArgs = [ model ];
 			_.each( argumentList, function( arg ) {
 				if( /[{].*[}]/.test( arg ) ) {
 					appliedArgs.push( message );
@@ -37,8 +37,8 @@ function mapMessageToCall( method, map ) {
 			return method.apply( undefined, appliedArgs );
 		};
 	} else {
-		return function( actor, message ) {
-			var appliedArgs = [ actor ];
+		return function( model, message ) {
+			var appliedArgs = [ model ];
 			_.each( argumentList, function( arg ) {
 				if( /[{].*[}]/.test( arg ) ) {
 					appliedArgs.push( message );

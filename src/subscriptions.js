@@ -12,15 +12,15 @@ function createReverseLookup( map ) {
 	}, {} );
 }
 
-function getSubscriptionMap( actors ) {
-	return _.reduce( actors, function( acc, actor ) {
-		var metadata = actor.metadata;
+function getSubscriptionMap( models ) {
+	return _.reduce( models, function( acc, model ) {
+		var metadata = model.metadata;
 		function prefix( topic ) {
-			return [ metadata.actor.type, topic ].join( "." );
+			return [ metadata.model.type, topic ].join( "." );
 		}
 		var events = _.map( _.keys( metadata.events || {} ), prefix );
 		var commands = _.map( _.keys( metadata.commands || {} ), prefix );
-		acc[ metadata.actor.type ] = {
+		acc[ metadata.model.type ] = {
 			events: events,
 			commands: commands
 		};
@@ -38,11 +38,11 @@ function getTopicList( map ) {
 }
 
 module.exports = {
-	getActorLookup: function( actors ) {
-		return createReverseLookup( getSubscriptionMap( actors ) );
+	getModelLookup: function( models ) {
+		return createReverseLookup( getSubscriptionMap( models ) );
 	},
 	getSubscriptions: getSubscriptionMap,
-	getTopics: function( actors ) {
-		return getTopicList( getSubscriptionMap( actors ) );
+	getTopics: function( models ) {
+		return getTopicList( getSubscriptionMap( models ) );
 	}
 };

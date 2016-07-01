@@ -6,27 +6,11 @@ var apply = require( "./apply" );
 var log = require( "./log" )( "consequent.dispatch" );
 var sliver;
 
-function enrichEvent( set, event ) {
-	event.id = sliver.getId();
-	var ambientType = event.type ? event.type.split( "." )[ 0 ] : "";
-	if ( ambientType === set.actor.type ) {
-		event.correlationId = set.actor.id;
-		event.vector = set.actor.vector;
-		event.actorType = set.actor.type;
-	} else {
-		event.actorType = ambientType;
-	}
-	event.initiatedBy = set.message.type || set.message.topic;
-	event.initiatedById = set.message.id;
-	event.createdOn = new Date().toISOString();
-}
-
 function enrichEvents( manager, result ) {
 	var promises = _.reduce( result, function( acc, set ) {
-		_.each( set.events, enrichEvent.bind( null, set ) );
-		var types = _.groupBy( set.events, "actorType" );
-		_.each( types, function( events, actorType ) {
-			var promise = manager.storeEvents( actorType, events[ 0 ].correlationId, events );
+		var types = _.groupBy( set.events, "modelType" );
+		_.each( types, function( events, modelType ) {
+			var promise = manager.storeEvents( modelType, events[ 0 ].modelId, events );
 			acc.push( promise );
 		} );
 		return acc;
@@ -38,20 +22,20 @@ function enrichEvents( manager, result ) {
 		} );
 }
 
-function handle( queue, lookup, manager, actors, id, topic, message ) {
+function handle( queue, lookup, manager, models, id, topic, message ) {
 	var types = lookup[ topic ] || [];
 	var error;
 
 	var dispatches = _.map( types, function( type ) {
-		if ( !actors[ type ] ) {
-			error = format( "No registered actors handle messages of type '%s'", topic );
+		if ( !models[ type ] ) {
+			error = format( "No registered models handle messages of type '%s'", topic );
 			log.error( error );
 			return when.reject( new Error( error ) );
 		}
 
 		return manager.getOrCreate( type, id )
 			.then(
-				onInstance.bind( null, actors, queue, manager, topic, message, id ),
+				onInstance.bind( null, models, queue, manager, topic, message, id ),
 				onInstanceError.bind( null, type )
 			);
 	} );
@@ -67,23 +51,23 @@ function onApplied( manager, result ) {
 	}
 }
 
-function onInstance( actors, queue, manager, topic, message, id, instance ) {
+function onInstance( models, queue, manager, topic, message, id, instance ) {
 	instance.state.id = instance.state.id || id;
-	return apply( actors, queue, topic, message, instance )
+	return apply( models, queue, topic, message, instance )
 		.then( onApplied.bind( null, manager ) );
 }
 
 function onInstanceError( type, err ) {
-	var error = format( "Failed to instantiate actor '%s' with %s", type, err.stack );
+	var error = format( "Failed to instantiate model '%s' with %s", type, err.stack );
 	log.error( error );
 	return when.reject( new Error( error ) );
 }
 
-module.exports = function( sliverFn, lookup, manager, actors, queue, limit ) {
+module.exports = function( sliverFn, lookup, manager, models, queue, limit ) {
 	sliver = sliverFn;
 	queue = queue || hashqueue.create( limit || 8 );
 	return {
-		apply: apply.bind( undefined, actors, queue ),
-		handle: handle.bind( undefined, queue, lookup, manager, actors )
+		apply: apply.bind( undefined, models, queue ),
+		handle: handle.bind( undefined, queue, lookup, manager, models )
 	};
 };

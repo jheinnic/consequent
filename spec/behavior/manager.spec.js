@@ -20,7 +20,7 @@ function mockQueue( id, fn ) {
 	return queue;
 }
 
-var actorAdapter = {
+var modelAdapter = {
 	fetch: _.noop,
 	findAncestor: _.noop,
 	store: _.noop
@@ -42,21 +42,21 @@ var managerFn = proxyquire( "../src/manager", {
 } );
 
 describe( "Manager", function() {
-	var actors;
+	var models;
 	before( function() {
-		return loader( fount, "./spec/actors" )
+		return loader( fount, "./spec/models" )
 			.then( function( list ) {
-				actors = list;
+				models = list;
 			} );
 	} );
-	describe( "when actor fetch fails", function() {
-		var actorMock, manager;
+	describe( "when model fetch fails", function() {
+		var modelMock, manager;
 		before( function() {
-			actorMock = sinon.mock( actorAdapter );
-			actorMock.expects( "fetch" )
+			modelMock = sinon.mock( modelAdapter );
+			modelMock.expects( "fetch" )
 				.withArgs( "account", 100 )
 				.rejects( new Error( "Nope sauce" ) );
-			manager = managerFn( actors, actorAdapter, eventAdapter, mockQueue() );
+			manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 		} );
 
 		it( "should reject with an error", function() {
@@ -64,51 +64,51 @@ describe( "Manager", function() {
 				.should.be.rejectedWith( "Nope sauce" );
 		} );
 
-		it( "should call fetch on actor adapter", function() {
-			actorMock.verify();
+		it( "should call fetch on model adapter", function() {
+			modelMock.verify();
 		} );
 	} );
 
-	describe( "when single actor instance exists", function() {
-		var actorMock, eventMock, manager, actor, state, events;
+	describe( "when single model instance exists", function() {
+		var modelMock, eventMock, manager, model, state, events;
 		before( function() {
 			state = {
 				lastEventId: 1,
 				id: 100
 			};
-			actor = {
+			model = {
 				type: "account"
 			};
 			events = [ { id: 2 }, { id: 3 } ];
 			var instance = {
-				actor: actor,
+				model: model,
 				state: state
 			};
-			actorMock = sinon.mock( actorAdapter );
-			actorMock.expects( "fetch" )
+			modelMock = sinon.mock( modelAdapter );
+			modelMock.expects( "fetch" )
 				.withArgs( "account", 100 )
 				.resolves( instance );
-			actorMock.expects( "store" ).never();
+			modelMock.expects( "store" ).never();
 			eventMock = sinon.mock( eventAdapter );
 			eventMock.expects( "fetch" )
 				.withArgs( "account", 100, 1 )
 				.resolves( events );
 			eventMock.expects( "storePack" ).never();
 
-			manager = managerFn( actors, actorAdapter, eventAdapter, mockQueue() );
+			manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 		} );
 
-		it( "should result in updated actor", function() {
+		it( "should result in updated model", function() {
 			return manager.getOrCreate( "account", 100 )
 				.should.eventually.eql( {
 					state: state,
-					actor: actor,
+					model: model,
 					applied: events
 				} );
 		} );
 
-		it( "should call fetch on actor adapter", function() {
-			actorMock.verify();
+		it( "should call fetch on model adapter", function() {
+			modelMock.verify();
 		} );
 
 		it( "should call fetch on event adapter", function() {
@@ -116,20 +116,20 @@ describe( "Manager", function() {
 		} );
 	} );
 
-	describe( "when multiple actor instances exist", function() {
-		var actorMock, eventMock, manager, instances, actor, state, events;
+	describe( "when multiple model instances exist", function() {
+		var modelMock, eventMock, manager, instances, model, state, events;
 		before( function() {
-			actor = { type: "account" };
+			model = { type: "account" };
 			instances = [
 				{
-					actor: actor,
+					model: model,
 					state: {
 						lastEventId: 4,
 						id: 100
 					}
 				},
 				{
-					actor: actor,
+					model: model,
 					state: {
 						lastEventId: 5,
 						id: 100
@@ -142,37 +142,37 @@ describe( "Manager", function() {
 			};
 			events = [ { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 } ];
 			var instance = {
-				actor: actor,
+				model: model,
 				state: state
 			};
-			actorMock = sinon.mock( actorAdapter );
-			actorMock.expects( "fetch" )
+			modelMock = sinon.mock( modelAdapter );
+			modelMock.expects( "fetch" )
 				.withArgs( "account", 100 )
 				.resolves( instances );
-			actorMock.expects( "findAncestor" )
+			modelMock.expects( "findAncestor" )
 				.withArgs( 100, instances, [] )
 				.resolves( instance );
-			actorMock.expects( "store" ).never();
+			modelMock.expects( "store" ).never();
 			eventMock = sinon.mock( eventAdapter );
 			eventMock.expects( "fetch" )
 				.withArgs( "account", 100, 1 )
 				.resolves( events );
 			eventMock.expects( "storePack" ).never();
 
-			manager = managerFn( actors, actorAdapter, eventAdapter, mockQueue() );
+			manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 		} );
 
-		it( "should result in updated actor", function() {
+		it( "should result in updated model", function() {
 			return manager.getOrCreate( "account", 100 )
 				.should.eventually.eql( {
-					actor: actor,
+					model: model,
 					state: state,
 					applied: events
 				} );
 		} );
 
-		it( "should call fetch on actor adapter", function() {
-			actorMock.verify();
+		it( "should call fetch on model adapter", function() {
+			modelMock.verify();
 		} );
 
 		it( "should call fetch on event adapter", function() {
@@ -182,9 +182,9 @@ describe( "Manager", function() {
 
 	describe( "when event threshold is exceeded", function() {
 		describe( "in normal mode", function() {
-			var actorMock, eventMock, manager, actor, state, events;
+			var modelMock, eventMock, manager, model, state, events;
 			before( function() {
-				actor = {
+				model = {
 					type: "account",
 					eventThreshold: 2
 				};
@@ -194,14 +194,14 @@ describe( "Manager", function() {
 				};
 				events = [ { id: 2 }, { id: 3 } ];
 				var instance = {
-					actor: actor,
+					model: model,
 					state: state
 				};
-				actorMock = sinon.mock( actorAdapter );
-				actorMock.expects( "fetch" )
+				modelMock = sinon.mock( modelAdapter );
+				modelMock.expects( "fetch" )
 					.withArgs( "account", 100 )
 					.resolves( instance );
-				actorMock.expects( "store" )
+				modelMock.expects( "store" )
 					.withArgs( instance )
 					.once()
 					.resolves( {} );
@@ -214,20 +214,20 @@ describe( "Manager", function() {
 					.once()
 					.resolves();
 
-				manager = managerFn( actors, actorAdapter, eventAdapter, mockQueue() );
+				manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 			} );
 
-			it( "should result in updated actor", function() {
+			it( "should result in updated model", function() {
 				return manager.getOrCreate( "account", 100 )
 					.should.eventually.eql( {
-						actor: actor,
+						model: model,
 						state: state,
 						applied: events
 					} );
 			} );
 
-			it( "should call fetch on actor adapter", function() {
-				actorMock.verify();
+			it( "should call fetch on model adapter", function() {
+				modelMock.verify();
 			} );
 
 			it( "should call fetch on event adapter", function() {
@@ -236,9 +236,9 @@ describe( "Manager", function() {
 		} );
 
 		describe( "in readOnly without snapshotOnRead", function() {
-			var actorMock, eventMock, manager, actor, state, events;
+			var modelMock, eventMock, manager, model, state, events;
 			before( function() {
-				actor = {
+				model = {
 					type: "account",
 					eventThreshold: 2
 				};
@@ -248,34 +248,34 @@ describe( "Manager", function() {
 				};
 				events = [ { id: 2 }, { id: 3 } ];
 				var instance = {
-					actor: actor,
+					model: model,
 					state: state
 				};
-				actorMock = sinon.mock( actorAdapter );
-				actorMock.expects( "fetch" )
+				modelMock = sinon.mock( modelAdapter );
+				modelMock.expects( "fetch" )
 					.withArgs( "account", 100 )
 					.resolves( instance );
-				actorMock.expects( "store" ).never();
+				modelMock.expects( "store" ).never();
 				eventMock = sinon.mock( eventAdapter );
 				eventMock.expects( "fetch" )
 					.withArgs( "account", 100, 1 )
 					.resolves( events );
 				eventMock.expects( "storePack" ).never();
 
-				manager = managerFn( actors, actorAdapter, eventAdapter, mockQueue() );
+				manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 			} );
 
-			it( "should result in updated actor", function() {
-				return manager.getOrCreate( "account", 100, true )
+			it( "should result in updated model", function() {
+				return manager.getOrCreate( "account", 100, [], true )
 					.should.eventually.eql( {
-						actor: actor,
+						model: model,
 						state: state,
 						applied: events
 					} );
 			} );
 
-			it( "should call fetch on actor adapter", function() {
-				actorMock.verify();
+			it( "should call fetch on model adapter", function() {
+				modelMock.verify();
 			} );
 
 			it( "should call fetch on event adapter", function() {
@@ -284,9 +284,9 @@ describe( "Manager", function() {
 		} );
 
 		describe( "in readOnly with snapshotOnRead", function() {
-			var actorMock, eventMock, manager, actor, state, events;
+			var modelMock, eventMock, manager, model, state, events;
 			before( function() {
-				actor = {
+				model = {
 					type: "account",
 					eventThreshold: 2,
 					snapshotOnRead: true
@@ -297,14 +297,14 @@ describe( "Manager", function() {
 				};
 				events = [ { id: 2 }, { id: 3 } ];
 				var instance = {
-					actor: actor,
+					model: model,
 					state: state
 				};
-				actorMock = sinon.mock( actorAdapter );
-				actorMock.expects( "fetch" )
+				modelMock = sinon.mock( modelAdapter );
+				modelMock.expects( "fetch" )
 					.withArgs( "account", 100 )
 					.resolves( instance );
-				actorMock.expects( "store" )
+				modelMock.expects( "store" )
 					.withArgs( instance )
 					.once()
 					.resolves( {} );
@@ -317,20 +317,20 @@ describe( "Manager", function() {
 					.once()
 					.resolves();
 
-				manager = managerFn( actors, actorAdapter, eventAdapter, mockQueue() );
+				manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 			} );
 
-			it( "should result in updated actor", function() {
+			it( "should result in updated model", function() {
 				return manager.getOrCreate( "account", 100, true )
 					.should.eventually.eql( {
-						actor: actor,
+						model: model,
 						state: state,
 						applied: events
 					} );
 			} );
 
-			it( "should call fetch on actor adapter", function() {
-				actorMock.verify();
+			it( "should call fetch on model adapter", function() {
+				modelMock.verify();
 			} );
 
 			it( "should call fetch on event adapter", function() {

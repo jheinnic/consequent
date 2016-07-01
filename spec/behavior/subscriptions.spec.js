@@ -4,17 +4,17 @@ var loader = require( "../../src/loader" );
 var fount = require( "fount" );
 
 describe( "Subscriptions", function() {
-	var actors;
+	var models;
 	before( function() {
-		return loader( fount, "./spec/actors" )
+		return loader( fount, "./spec/models" )
 			.then( function( result ) {
-				actors = result;
+				models = result;
 			} );
 	} );
 
-	describe( "when creating subscriptions for actors", function() {
+	describe( "when creating subscriptions for models", function() {
 		it( "should create subscription map", function() {
-			subscriptions.getSubscriptions( actors ).should.eql( {
+			subscriptions.getSubscriptions( models ).should.eql( {
 				account: {
 					commands: [
 						"account.open",
@@ -33,7 +33,7 @@ describe( "Subscriptions", function() {
 		} );
 
 		it( "should create topic list", function() {
-			subscriptions.getTopics( actors ).should.eql(
+			subscriptions.getTopics( models ).should.eql(
 				( [
 					"account.open",
 					"account.close",
@@ -48,7 +48,7 @@ describe( "Subscriptions", function() {
 		} );
 
 		it( "should create reverse lookup", function() {
-			subscriptions.getActorLookup( actors ).should.eql(
+			subscriptions.getModelLookup( models ).should.eql(
 				{
 					"account.open": [ "account" ],
 					"account.close": [ "account" ],

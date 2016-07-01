@@ -1,22 +1,47 @@
 var _ = require( "lodash" );
 var when = require( "when" );
+var sliver = require( "sliver" )();
 
-function apply( actors, queue, topic, message, instance ) {
-	var type = instance.actor.type;
-	var metadata = actors[ type ].metadata;
+function apply( models, queue, topic, message, instance ) {
+	var type = instance.model.type;
+	var metadata = models[ type ].metadata;
 	var parts = topic.split( "." );
 	var alias = parts[ 0 ] === type ? parts.slice( 1 ).join( "." ) : topic;
 	var isCommand = metadata.commands[ alias ];
 	var getHandlers = isCommand ? getCommandHandlers : getEventHandlers;
-	var process = isCommand ? processCommand : processEvent;
 	var handlers = getHandlers( metadata, instance, alias, message );
-	var results = _.map( handlers, function( handle ) {
-		return queue.add( instance.state.id, function() {
-			return process( handle, instance, message );
+	if( isCommand ) {
+		var results = _.map( handlers, function( handle ) {
+			return queue.add( instance.state.id, function() {
+				return processCommand( models, handle, instance, message );
+			} );
 		} );
-	} );
-	return when.all( results )
-		.then( _.filter );
+		return when.all( results )
+			.then( _.filter );
+	} else {
+		var q = immediateQueue();
+		_.each( handlers, function( handle ) {
+			q.add( null, function() {
+				processEvent( models, handle, instance, message );
+			} );
+		} );
+		return when();
+	}
+}
+
+function enrichEvent( model, command, event ) {
+	event.id = sliver.getId();
+	var ambientType = event.type ? event.type.split( "." )[ 0 ] : "";
+	if ( ambientType === model.type ) {
+		event.modelId = model.id;
+		event.vector = model.vector;
+		event.modelType = model.type;
+	} else {
+		event.modelType = ambientType;
+	}
+	event.initiatedBy = command.type || command.topic;
+	event.initiatedById = command.id;
+	event.createdOn = new Date().toISOString();
 }
 
 function filterHandlers( handlers, instance, message ) {
@@ -46,18 +71,34 @@ function getEventHandlers( metadata, instance, topic, message ) {
 	return filterHandlers( metadata.events[ topic ], instance, message );
 }
 
-function processCommand( handle, instance, command ) {
+function immediateQueue() {
+	return {
+		add: function add ( id, cb ) {
+			return cb();
+		}
+	};
+}
+
+function processCommand( models, handle, instance, command ) {
 	var result = handle( instance.state, command );
 	result = result && result.then ? result : when( result );
-	var actor = { type: instance.actor.type };
-	_.merge( actor, instance.state );
+	var model = { type: instance.model.type };
+		
 	function onSuccess( events ) {
+		_.merge( model, instance.state );
+		var original = _.cloneDeep( model );
 		events = _.isArray( events ) ? events : [ events ];
-		instance.state.lastCommandId = command.id;
-		instance.state.lastCommandHandledOn = new Date().toISOString();
+		_.each( events, enrichEvent.bind( null, model, command ) );
+		model.lastCommandId = command.id;
+		model.lastCommandHandledOn = new Date().toISOString();
+		_.each( events, function( e ) {
+			apply( models, immediateQueue(), e.type, e, instance );
+		} );
+		
 		return {
 			message: command,
-			actor: actor,
+			model: instance.state,
+			original: original,
 			events: events || []
 		};
 	}
@@ -66,26 +107,28 @@ function processCommand( handle, instance, command ) {
 		return {
 			rejected: true,
 			message: command,
-			actor: actor,
+			model: model,
 			reason: err
 		};
 	}
 
 	return result
-		.then( onSuccess, onError );
+		.then( onSuccess, onError )
+		.then( ( set ) => {
+			
+			return set;
+		} );
 }
 
-function processEvent( handle, instance, event ) {
-	return when.resolve( handle( instance.state, event ) )
-		.then( function() {
-			if ( instance.actor.aggregateFrom ) {
-				instance.state.lastEventId = instance.state.lastEventId || {};
-				instance.state.lastEventId[ event.actorType ] = event.id;
-			} else {
-				instance.state.lastEventId = event.id;
-			}
-			instance.state.lastEventAppliedOn = new Date().toISOString();
-		} );
+function processEvent( models, handle, instance, event ) {
+	handle( instance.state, event );
+	if ( instance.model.aggregateFrom ) {
+		instance.state.lastEventId = instance.state.lastEventId || {};
+		instance.state.lastEventId[ event.modelType ] = event.id;
+	} else {
+		instance.state.lastEventId = event.id;
+	}
+	instance.state.lastEventAppliedOn = new Date().toISOString();
 }
 
 module.exports = apply;

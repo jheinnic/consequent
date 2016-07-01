@@ -2,7 +2,7 @@ var _ = require( "lodash" );
 var when = require( "when" );
 var format = require( "util" ).format;
 var clock = require( "vectorclock" );
-var log = require( "./log" )( "consequent.actors" );
+var log = require( "./log" )( "consequent.models" );
 
 function getAdapter( adapters, lib, io, type ) {
 	var adapter = adapters[ io ][ type ];
@@ -21,13 +21,13 @@ function getStore( adapters, storeLib, type ) {
 	return getAdapter( adapters, storeLib, "store", type );
 }
 
-function getActorFromCache( actors, adapters, cacheLib, type, id ) {
+function getFromCache( models, adapters, cacheLib, type, id ) {
 	var cache = getCache( adapters, cacheLib, type );
 
 	function onInstance( instance ) {
 		var clone;
 		if ( instance ) {
-			clone = _.cloneDeep( actors[ type ].metadata );
+			clone = _.cloneDeep( models[ type ].metadata );
 			clone.state = instance;
 			clone.state.id = id;
 		}
@@ -44,17 +44,17 @@ function getActorFromCache( actors, adapters, cacheLib, type, id ) {
 		.then( onInstance, onError );
 }
 
-function getActorFromStore( actors, adapters, storeLib, type, id ) {
+function getFromStore( models, adapters, storeLib, type, id ) {
 	var store = getStore( adapters, storeLib, type );
 
 	function onInstance( instance ) {
-		var promise = actors[ type ].factory( id );
+		var promise = models[ type ].factory( id );
 		if ( !promise.then ) {
 			promise = when.resolve( promise );
 		}
 		return promise
 			.then( function( state ) {
-				var clone = _.cloneDeep( actors[ type ].metadata );
+				var clone = _.cloneDeep( models[ type ].metadata );
 				if ( instance ) {
 					clone.state = _.defaults( instance, state );
 				}
@@ -73,17 +73,17 @@ function getActorFromStore( actors, adapters, storeLib, type, id ) {
 		.then( onInstance, onError );
 }
 
-function getBaseline( actors, adapters, storeLib, cacheLib, type, id ) {
-	function onActor( instance ) {
+function getBaseline( models, adapters, storeLib, cacheLib, type, id ) {
+	function onmodel( instance ) {
 		if ( instance ) {
 			return instance;
 		} else {
-			return getActorFromStore( actors, adapters, storeLib, type, id );
+			return getFromStore( models, adapters, storeLib, type, id );
 		}
 	}
 
-	return getActorFromCache( actors, adapters, cacheLib, type, id )
-		.then( onActor );
+	return getFromCache( models, adapters, cacheLib, type, id )
+		.then( onmodel );
 }
 
 function parseVector( vector ) {
@@ -102,10 +102,10 @@ function stringifyVector( vector ) {
 	return pairs.join( ";" );
 }
 
-function storeSnapshot( actors, adapters, storeLib, cacheLib, nodeId, instance ) {
-	var actor = instance.actor;
+function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance ) {
+	var model = instance.model;
 	var state = instance.state;
-	var type = actor.type;
+	var type = model.type;
 	var cache = getCache( adapters, cacheLib, type );
 	var store = getStore( adapters, storeLib, type );
 	var vector = parseVector( state.vector || "" );
@@ -113,7 +113,7 @@ function storeSnapshot( actors, adapters, storeLib, cacheLib, nodeId, instance )
 	state.ancestor = state.vector;
 	state.vector = stringifyVector( vector );
 	function onCacheError( err ) {
-		var error = format( "Failed to cache actor '%s' of '%s' with %s", state.id, type, err );
+		var error = format( "Failed to cache model '%s' of '%s' with %s", state.id, type, err );
 		log.error( error );
 		throw new Error( error );
 	}
@@ -124,7 +124,7 @@ function storeSnapshot( actors, adapters, storeLib, cacheLib, nodeId, instance )
 	}
 
 	function onError( err ) {
-		var error = format( "Failed to store actor '%s' of '%s' with %s", state.id, type, err );
+		var error = format( "Failed to store model '%s' of '%s' with %s", state.id, type, err );
 		log.error( error );
 		throw new Error( error );
 	}
@@ -133,14 +133,14 @@ function storeSnapshot( actors, adapters, storeLib, cacheLib, nodeId, instance )
 		.then( onStored, onError );
 }
 
-module.exports = function( actors, actorStoreLib, actorCacheLib, nodeId ) {
+module.exports = function( models, modelStoreLib, modelCacheLib, nodeId ) {
 	var adapters = {
 		store: {},
 		cache: {}
 	};
 	return {
 		adapters: adapters,
-		fetch: getBaseline.bind( null, actors, adapters, actorStoreLib, actorCacheLib ),
-		store: storeSnapshot.bind( null, actors, adapters, actorStoreLib, actorCacheLib, nodeId )
+		fetch: getBaseline.bind( null, models, adapters, modelStoreLib, modelCacheLib ),
+		store: storeSnapshot.bind( null, models, adapters, modelStoreLib, modelCacheLib, nodeId )
 	};
 };
