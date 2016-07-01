@@ -61,17 +61,17 @@ describe( "Consequent Example", function() {
 						},
 						events: [
 							{
-								modelId: "0000001",
-								modelType: "account",
-								initiatedBy: "account.open",
+								_modelId: "0000001",
+								_modelType: "account",
+								_initiatedBy: "account.open",
 								type: "account.opened",
 								accountHolder: "Test User",
 								accountNumber: "0000001"
 							},
 							{
-								modelId: "0000001",
-								modelType: "account",
-								initiatedBy: "account.open",
+								_modelId: "0000001",
+								_modelType: "account",
+								_initiatedBy: "account.open",
 								type: "account.deposited",
 								initial: true,
 								amount: 100

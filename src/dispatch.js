@@ -8,9 +8,9 @@ var sliver;
 
 function enrichEvents( manager, result ) {
 	var promises = _.reduce( result, function( acc, set ) {
-		var types = _.groupBy( set.events, "modelType" );
+		var types = _.groupBy( set.events, "_modelType" );
 		_.each( types, function( events, modelType ) {
-			var promise = manager.storeEvents( modelType, events[ 0 ].modelId, events );
+			var promise = manager.storeEvents( modelType, events[ 0 ]._modelId, events );
 			acc.push( promise );
 		} );
 		return acc;

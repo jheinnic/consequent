@@ -132,6 +132,7 @@ Any arguments listed in the model module's exported function will be supplied vi
 #### Optional fields
 
  * `eventThreshold` - set the number of events that will trigger a new snapshot
+ * `storeEventPack` - record events contributing to snapshot as a pack, default is false
  * `snapshotDuringPartition` - sets whether snapshots can be created during partitions, default is false*
  * `snapshotOnRead` - sets whether or not snapshots should be created on reads, default is false for domain models
 
@@ -197,9 +198,9 @@ module.exports = function() {
 		state: {
 			// *reserved fields*
 			id: "",
-			vector: "",
-			ancestor: "",
-			lastEventId: 0,
+			_vector: "",
+			_ancestor: "",
+			_lastEventId: "",
 			// other properties that track state
 		},
 		commands:

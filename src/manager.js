@@ -79,8 +79,12 @@ function snapshot( modelAdapter, eventAdapter, events, readOnly, instance ) {
 	var underLimit = events.length < limit;
 
 	function onSnapshot() {
-		return eventAdapter.storePack( model.type, state.id, state.vector, state.lastEventId, events )
-			.then( onEventpack, onEventpackError );
+		if( model.storeEventPack ) {
+			return eventAdapter.storePack( model.type, state.id, state.vector, state.lastEventId, events )
+				.then( onEventpack, onEventpackError );
+		} else {
+			return instance;
+		}
 	}
 
 	function onSnapshotError() {

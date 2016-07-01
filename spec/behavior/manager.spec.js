@@ -186,7 +186,8 @@ describe( "Manager", function() {
 			before( function() {
 				model = {
 					type: "account",
-					eventThreshold: 2
+					eventThreshold: 2,
+					storeEventPack: true
 				};
 				state = {
 					lastEventId: 1,
@@ -240,7 +241,8 @@ describe( "Manager", function() {
 			before( function() {
 				model = {
 					type: "account",
-					eventThreshold: 2
+					eventThreshold: 2,
+					storeEventPack: true
 				};
 				state = {
 					lastEventId: 1,
@@ -289,6 +291,7 @@ describe( "Manager", function() {
 				model = {
 					type: "account",
 					eventThreshold: 2,
+					storeEventPack: true,
 					snapshotOnRead: true
 				};
 				state = {

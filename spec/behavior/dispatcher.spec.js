@@ -162,9 +162,9 @@ describe( "Dispatch", function() {
 							model: _.omit( instance.state, "lastCommandId", "lastCommandHandledOn" ),
 							events: [
 								{
-									modelType: "test",
-									modelId: 100,
-									initiatedBy: "doAThing",
+									_modelType: "test",
+									_modelId: 100,
+									_initiatedBy: "doAThing",
 									type: "test.thingDid",
 									degree: "totes mcgoats"
 								}

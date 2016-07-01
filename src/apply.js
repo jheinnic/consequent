@@ -33,15 +33,18 @@ function enrichEvent( model, command, event ) {
 	event.id = sliver.getId();
 	var ambientType = event.type ? event.type.split( "." )[ 0 ] : "";
 	if ( ambientType === model.type ) {
-		event.modelId = model.id;
-		event.vector = model.vector;
-		event.modelType = model.type;
+		event._modelId = model.id;
+		event._modelType = model.type;
 	} else {
-		event.modelType = ambientType;
+		event._modelType = ambientType;
 	}
-	event.initiatedBy = command.type || command.topic;
-	event.initiatedById = command.id;
-	event.createdOn = new Date().toISOString();
+	event._initiatedBy = command.type || command.topic;
+	event._initiatedById = command.id;
+	event._createdBy = model.type;
+	event._createdById = model.id;
+	event._createdByVector = model._vector;
+	event._createdByVersion = model._version;
+	event._createdOn = new Date().toISOString();
 }
 
 function filterHandlers( handlers, instance, message ) {
@@ -83,7 +86,7 @@ function processCommand( models, handle, instance, command ) {
 	var result = handle( instance.state, command );
 	result = result && result.then ? result : when( result );
 	var model = { type: instance.model.type };
-		
+
 	function onSuccess( events ) {
 		_.merge( model, instance.state );
 		var original = _.cloneDeep( model );
