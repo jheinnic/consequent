@@ -205,7 +205,7 @@ describe( "Models", function() {
 			before( function() {
 				account = {
 					id: 1001,
-					vector: "a:1"
+					_vector: "a:1"
 				};
 				cacheMock = sinon.mock( cache );
 				cacheMock.expects( "store" )
@@ -236,7 +236,7 @@ describe( "Models", function() {
 			before( function() {
 				account = {
 					id: 1001,
-					vector: "a:1"
+					_vector: "a:1"
 				};
 				cacheMock = sinon.mock( cache );
 				cacheMock.expects( "store" ).never();
@@ -265,7 +265,7 @@ describe( "Models", function() {
 			before( function() {
 				account = {
 					id: 1001,
-					vector: "a:1"
+					_vector: "a:1"
 				};
 				cacheMock = sinon.mock( cache );
 				cacheMock.expects( "store" )

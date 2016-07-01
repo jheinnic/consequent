@@ -90,7 +90,7 @@ function processCommand( models, handle, instance, command ) {
 	function onSuccess( events ) {
 		_.merge( model, instance.state );
 		var original = _.cloneDeep( model );
-		events = _.isArray( events ) ? events : [ events ];
+		events = _.filter( _.isArray( events ) ? events : [ events ] );
 		_.each( events, enrichEvent.bind( null, model, command ) );
 		model.lastCommandId = command.id;
 		model.lastCommandHandledOn = new Date().toISOString();

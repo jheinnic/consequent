@@ -46,7 +46,6 @@ function getFromCache( models, adapters, cacheLib, type, id ) {
 
 function getFromStore( models, adapters, storeLib, type, id ) {
 	var store = getStore( adapters, storeLib, type );
-
 	function onInstance( instance ) {
 		var promise = models[ type ].factory( id );
 		if ( !promise.then ) {
@@ -86,6 +85,14 @@ function getBaseline( models, adapters, storeLib, cacheLib, type, id ) {
 		.then( onmodel );
 }
 
+function getVersion( vector ) {
+	var clocks = vector.split( ";" );
+	return clocks.reduce( function( version, clock ) {
+		var parts = clock.split( ":" );
+		return version + parseInt( parts[ 1 ] );
+	}, 0 );
+}
+
 function parseVector( vector ) {
 	var pairs = vector.split( ";" );
 	return _.reduce( pairs, function( acc, pair ) {
@@ -96,9 +103,9 @@ function parseVector( vector ) {
 }
 
 function stringifyVector( vector ) {
-	var pairs = _.map( vector, function( v, k ) {
-		return k + ":" + v;
-	} );
+	var pairs = _.filter( _.map( vector, function( v, k ) {
+		return k && v ? `${k}:${v}` : "";
+	} ) );
 	return pairs.join( ";" );
 }
 
@@ -108,10 +115,11 @@ function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance )
 	var type = model.type;
 	var cache = getCache( adapters, cacheLib, type );
 	var store = getStore( adapters, storeLib, type );
-	var vector = parseVector( state.vector || "" );
+	var vector = parseVector( state._vector || "" );
 	vector = clock.increment( vector, nodeId );
-	state.ancestor = state.vector;
-	state.vector = stringifyVector( vector );
+	state._ancestor = state._vector;
+	state._vector = stringifyVector( vector );
+	state._version = getVersion( state._vector );
 	function onCacheError( err ) {
 		var error = format( "Failed to cache model '%s' of '%s' with %s", state.id, type, err );
 		log.error( error );
@@ -119,7 +127,7 @@ function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance )
 	}
 
 	function onStored() {
-		return cache.store( state.id, state.vector, state )
+		return cache.store( state.id, state._vector, state )
 			.then( null, onCacheError );
 	}
 
@@ -129,7 +137,7 @@ function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance )
 		throw new Error( error );
 	}
 
-	return store.store( state.id, state.vector, state )
+	return store.store( state.id, state._vector, state )
 		.then( onStored, onError );
 }
 
