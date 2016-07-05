@@ -73,7 +73,7 @@ describe( "Manager", function() {
 		var modelMock, eventMock, manager, model, state, events;
 		before( function() {
 			state = {
-				lastEventId: 1,
+				_lastEventId: 1,
 				id: 100
 			};
 			model = {
@@ -124,20 +124,20 @@ describe( "Manager", function() {
 				{
 					model: model,
 					state: {
-						lastEventId: 4,
+						_lastEventId: 4,
 						id: 100
 					}
 				},
 				{
 					model: model,
 					state: {
-						lastEventId: 5,
+						_lastEventId: 5,
 						id: 100
 					}
 				}
 			];
 			state = {
-				lastEventId: 1,
+				_lastEventId: 1,
 				id: 100
 			};
 			events = [ { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 } ];
@@ -186,11 +186,12 @@ describe( "Manager", function() {
 			before( function() {
 				model = {
 					type: "account",
+					_eventsRead: 2,
 					eventThreshold: 2,
 					storeEventPack: true
 				};
 				state = {
-					lastEventId: 1,
+					_lastEventId: 1,
 					id: 100
 				};
 				events = [ { id: 2 }, { id: 3 } ];
@@ -203,17 +204,13 @@ describe( "Manager", function() {
 					.withArgs( "account", 100 )
 					.resolves( instance );
 				modelMock.expects( "store" )
-					.withArgs( instance )
-					.once()
-					.resolves( {} );
+					.never();
 				eventMock = sinon.mock( eventAdapter );
 				eventMock.expects( "fetch" )
 					.withArgs( "account", 100, 1 )
 					.resolves( events );
 				eventMock.expects( "storePack" )
-					.withArgs( "account", state.id, undefined, 1, events )
-					.once()
-					.resolves();
+					.never();
 
 				manager = managerFn( models, modelAdapter, eventAdapter, mockQueue() );
 			} );
@@ -245,7 +242,7 @@ describe( "Manager", function() {
 					storeEventPack: true
 				};
 				state = {
-					lastEventId: 1,
+					_lastEventId: 1,
 					id: 100
 				};
 				events = [ { id: 2 }, { id: 3 } ];
@@ -295,7 +292,7 @@ describe( "Manager", function() {
 					snapshotOnRead: true
 				};
 				state = {
-					lastEventId: 1,
+					_lastEventId: 1,
 					id: 100
 				};
 				events = [ { id: 2 }, { id: 3 } ];
@@ -324,7 +321,7 @@ describe( "Manager", function() {
 			} );
 
 			it( "should result in updated model", function() {
-				return manager.getOrCreate( "account", 100, true )
+				return manager.getOrCreate( "account", 100, [], true )
 					.should.eventually.eql( {
 						model: model,
 						state: state,

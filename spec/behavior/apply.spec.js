@@ -166,7 +166,7 @@ describe( "Apply", function() {
 				return apply( models, queue, "doOne", {}, instance )
 					.should.eventually.partiallyEql( [
 						{
-							model: {
+							state: {
 								id: 1
 							},
 							events: [
@@ -185,7 +185,7 @@ describe( "Apply", function() {
 				return apply( models, queue, "doTwo", {}, instance )
 					.should.eventually.partiallyEql( [
 						{
-							model: {
+							state: {
 								id: 1
 							},
 							events: [
@@ -196,7 +196,7 @@ describe( "Apply", function() {
 							message: {}
 						},
 						{
-							model: {
+							state: {
 								id: 1
 							},
 							events: [

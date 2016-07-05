@@ -8,11 +8,12 @@ function get( state, type, id ) {
 	}
 }
 
-function set( state, type, id, instance ) {
+function set( state, type, id, vector, instance ) {
 	if ( !state[ type ] ) {
 		state[ type ] = {};
 	}
 	state[ type ][ id ] = instance;
+	return when();
 }
 
 module.exports = function() {

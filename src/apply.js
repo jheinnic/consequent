@@ -10,23 +10,15 @@ function apply( models, queue, topic, message, instance ) {
 	var isCommand = metadata.commands[ alias ];
 	var getHandlers = isCommand ? getCommandHandlers : getEventHandlers;
 	var handlers = getHandlers( metadata, instance, alias, message );
-	if( isCommand ) {
-		var results = _.map( handlers, function( handle ) {
-			return queue.add( instance.state.id, function() {
-				return processCommand( models, handle, instance, message );
-			} );
+	var q = isCommand ? queue : immediateQueue();
+	var processMessage = isCommand ? processCommand : processEvent;
+	var results = _.map( handlers, function( handle ) {
+		return q.add( instance.state.id, function() {
+			return processMessage( models, handle, instance, message );
 		} );
-		return when.all( results )
-			.then( _.filter );
-	} else {
-		var q = immediateQueue();
-		_.each( handlers, function( handle ) {
-			q.add( null, function() {
-				processEvent( models, handle, instance, message );
-			} );
-		} );
-		return when();
-	}
+	} );
+	return when.all( results )
+		.then( _.filter );
 }
 
 function enrichEvent( model, command, event ) {
@@ -38,12 +30,12 @@ function enrichEvent( model, command, event ) {
 	} else {
 		event._modelType = ambientType;
 	}
-	event._initiatedBy = command.type || command.topic;
-	event._initiatedById = command.id;
+	event._commandType = command.type || command.topic;
+	event._commandId = command.id || "";
 	event._createdBy = model.type;
 	event._createdById = model.id;
-	event._createdByVector = model._vector;
-	event._createdByVersion = model._version;
+	event._createdByVector = model._vector || "";
+	event._createdByVersion = model._version || "";
 	event._createdOn = new Date().toISOString();
 }
 
@@ -85,22 +77,21 @@ function immediateQueue() {
 function processCommand( models, handle, instance, command ) {
 	var result = handle( instance.state, command );
 	result = result && result.then ? result : when( result );
-	var model = { type: instance.model.type };
-
 	function onSuccess( events ) {
-		_.merge( model, instance.state );
+		var model = instance.state;
+		model.type = instance.model.type;
 		var original = _.cloneDeep( model );
 		events = _.filter( _.isArray( events ) ? events : [ events ] );
+		model._lastCommandId = command.id;
+		model._lastCommandHandledOn = new Date().toISOString();
 		_.each( events, enrichEvent.bind( null, model, command ) );
-		model.lastCommandId = command.id;
-		model.lastCommandHandledOn = new Date().toISOString();
 		_.each( events, function( e ) {
 			apply( models, immediateQueue(), e.type, e, instance );
 		} );
-		
 		return {
 			message: command,
-			model: instance.state,
+			model: instance.model,
+			state: instance.state,
 			original: original,
 			events: events || []
 		};
@@ -110,7 +101,8 @@ function processCommand( models, handle, instance, command ) {
 		return {
 			rejected: true,
 			message: command,
-			model: model,
+			model: instance.model,
+			state: model,
 			reason: err
 		};
 	}
@@ -118,20 +110,26 @@ function processCommand( models, handle, instance, command ) {
 	return result
 		.then( onSuccess, onError )
 		.then( ( set ) => {
-			
 			return set;
 		} );
 }
 
 function processEvent( models, handle, instance, event ) {
+	var original = _.cloneDeep( instance.state );
 	handle( instance.state, event );
 	if ( instance.model.aggregateFrom ) {
-		instance.state.lastEventId = instance.state.lastEventId || {};
-		instance.state.lastEventId[ event.modelType ] = event.id;
+		instance.state._lastEventId = instance.state._lastEventId || {};
+		instance.state._lastEventId[ event.modelType ] = event.id;
 	} else {
-		instance.state.lastEventId = event.id;
+		instance.state._lastEventId = event.id;
 	}
-	instance.state.lastEventAppliedOn = new Date().toISOString();
+	instance.state._lastEventAppliedOn = new Date().toISOString();
+	return {
+		events: [ event ],
+		orginal: original,
+		state: instance.state,
+		model: instance.model
+	};
 }
 
 module.exports = apply;

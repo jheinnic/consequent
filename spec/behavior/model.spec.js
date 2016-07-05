@@ -2,6 +2,7 @@ require( "../setup" );
 var loader = require( "../../src/loader" );
 var fount = require( "fount" );
 var modelFn = require( "../../src/model" );
+var sliver = require( "sliver" )();
 
 var store = {
 	fetch: _.noop,
@@ -25,7 +26,7 @@ describe( "Models", function() {
 	describe( "when fetching an model", function() {
 		var model;
 		before( function() {
-			model = modelFn( models, {}, {} );
+			model = modelFn( sliver, models, {}, {} );
 			model.adapters.store.account = store;
 			model.adapters.cache.account = cache;
 		} );
@@ -195,7 +196,7 @@ describe( "Models", function() {
 	describe( "when storing snapshot", function() {
 		var model;
 		before( function() {
-			model = modelFn( models, {}, {}, "a" );
+			model = modelFn( sliver, models, {}, {}, "a" );
 			model.adapters.store.account = store;
 			model.adapters.cache.account = cache;
 		} );

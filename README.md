@@ -92,7 +92,7 @@ Successful resolution should provide a hash with the following structure:
 {
 	message: {},
 	original: {}, // the snapshot (if one existed) of the model before applying the result of the command
-	model: {}, // the state that results from applying the events resulting from the command
+	state: {}, // the state that results from applying the events resulting from the command
 	events: []
 }
 ```
@@ -103,7 +103,7 @@ Rejection will give an error object with the following structure:
 	rejected: true,
 	reason: "",
 	message: {},
-	model: {}
+	state: {}
 }
 ```
 

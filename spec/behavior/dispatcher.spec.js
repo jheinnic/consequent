@@ -23,18 +23,27 @@ function mockQueue( id, fn ) {
 }
 
 function mockManager( type, id, result, calls ) {
-	var manager = { getOrCreate: function() {}, storeEvents: _.noop };
+	var manager = { 
+		getOrCreate: _.noop,
+		snapshot: _.noop,
+		storeEvents: _.noop
+	};
 	var mock = sinon.mock( manager );
 	if ( type ) {
-		var expectation = mock
+		var getExpectation = mock
 			.expects( "getOrCreate" )
 			.exactly( calls || 1 )
 			.withArgs( type, id );
 		if ( result.name ) {
-			expectation.rejects( result );
+			getExpectation.rejects( result );
 		} else {
-			expectation.resolves( result );
+			getExpectation.resolves( result );
 		}
+
+		var snapshotExpectation = mock
+			.expects( "snapshot" )
+			.exactly( calls || 1 )
+			.resolves( result );
 	} else {
 		mock
 			.expects( "getOrCreate" )
@@ -138,7 +147,7 @@ describe( "Dispatch", function() {
 				}
 			};
 
-			loader( fount, metadata )
+			return loader( fount, metadata )
 				.then( function( list ) {
 					models = list;
 					instance = _.cloneDeep( models.test.metadata );
@@ -146,6 +155,7 @@ describe( "Dispatch", function() {
 					command = { type: "doAThing", howMuch: "totes mcgoats" };
 					event = { type: "thindDid", degree: "totes mcgoats" };
 					manager = mockManager( "test", 100, instance, 2 );
+
 					lookup = {
 						doAThing: [ "test" ],
 						thingDid: [ "test" ]
@@ -159,12 +169,12 @@ describe( "Dispatch", function() {
 				.should.eventually.partiallyEql(
 					[
 						{
-							model: _.omit( instance.state, "lastCommandId", "lastCommandHandledOn" ),
+							state: _.omit( instance.state, "lastCommandId", "lastCommandHandledOn" ),
 							events: [
 								{
 									_modelType: "test",
 									_modelId: 100,
-									_initiatedBy: "doAThing",
+									_commandType: "doAThing",
 									type: "test.thingDid",
 									degree: "totes mcgoats"
 								}

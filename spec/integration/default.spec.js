@@ -52,7 +52,7 @@ describe( "Consequent Example", function() {
 							balance: 0,
 							transactions: []
 						},
-						model: {
+						state: {
 							id: "0000001",
 							balance: 100,
 							transactions: [
@@ -63,7 +63,7 @@ describe( "Consequent Example", function() {
 							{
 								_modelId: "0000001",
 								_modelType: "account",
-								_initiatedBy: "account.open",
+								_commandType: "account.open",
 								type: "account.opened",
 								accountHolder: "Test User",
 								accountNumber: "0000001"
@@ -71,7 +71,7 @@ describe( "Consequent Example", function() {
 							{
 								_modelId: "0000001",
 								_modelType: "account",
-								_initiatedBy: "account.open",
+								_commandType: "account.open",
 								type: "account.deposited",
 								initial: true,
 								amount: 100

@@ -41,7 +41,7 @@ function initialize( config ) {
 	function onMetadata( models ) {
 		var lookup = subscriptions.getModelLookup( models );
 		var topics = subscriptions.getTopics( models );
-		var modelAdapter = modelsFn( models, config.modelStore, config.modelCache, config.nodeId || defaultNodeId );
+		var modelAdapter = modelsFn( sliver, models, config.modelStore, config.modelCache, config.nodeId || defaultNodeId );
 		var eventAdapter = eventsFn( sliver, config.eventStore, config.eventCache );
 		var manager = managerFn( models, modelAdapter, eventAdapter, queue );
 		var search = searchFn( models, config.searchAdapter );
@@ -51,11 +51,13 @@ function initialize( config ) {
 			apply: function( instance, message ) {
 				return apply( models, config.queue, message.type || message.topic, message, instance );
 			},
-			fetch: ( type, id, readOnly ) => {
-				return manager.getOrCreate( type, id, readOnly )
+			fetch: ( type, id, eventCriteria ) => {
+				return manager.getOrCreate( type, id, eventCriteria, true )
 					.then( ( instance ) => instance.state );
 			},
-			fetchRaw: manager.getOrCreate,
+			fetchRaw: ( type, id, eventCriteria ) => {
+				return manager.getOrCreate( type, id, eventCriteria, true );
+			},
 			mapEvents: eventAdapter.mapEvents,
 			find: search.find,
 			handle: dispatcher.handle,

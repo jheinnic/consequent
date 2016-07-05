@@ -109,7 +109,7 @@ function stringifyVector( vector ) {
 	return pairs.join( ";" );
 }
 
-function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance ) {
+function storeSnapshot( sliver, models, adapters, storeLib, cacheLib, nodeId, instance ) {
 	var model = instance.model;
 	var state = instance.state;
 	var type = model.type;
@@ -117,6 +117,7 @@ function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance )
 	var store = getStore( adapters, storeLib, type );
 	var vector = parseVector( state._vector || "" );
 	vector = clock.increment( vector, nodeId );
+	state._snapshotId = sliver.getId();
 	state._ancestor = state._vector;
 	state._vector = stringifyVector( vector );
 	state._version = getVersion( state._vector );
@@ -141,7 +142,7 @@ function storeSnapshot( models, adapters, storeLib, cacheLib, nodeId, instance )
 		.then( onStored, onError );
 }
 
-module.exports = function( models, modelStoreLib, modelCacheLib, nodeId ) {
+module.exports = function( sliver, models, modelStoreLib, modelCacheLib, nodeId ) {
 	var adapters = {
 		store: {},
 		cache: {}
@@ -149,6 +150,6 @@ module.exports = function( models, modelStoreLib, modelCacheLib, nodeId ) {
 	return {
 		adapters: adapters,
 		fetch: getBaseline.bind( null, models, adapters, modelStoreLib, modelCacheLib ),
-		store: storeSnapshot.bind( null, models, adapters, modelStoreLib, modelCacheLib, nodeId )
+		store: storeSnapshot.bind( null, sliver, models, adapters, modelStoreLib, modelCacheLib, nodeId )
 	};
 };
